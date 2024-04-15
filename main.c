@@ -50,9 +50,14 @@ void normv2line(vector2_t u, vector2_t v, int color);
 vector3_t project(vector3_t v);
 void normv2triangle(vector2_t u, vector2_t v, vector2_t w, int color);
 matrix4x4_t transformationMatrix();
-void v3mesh(v3mesh_t mesh);
+void v3meshdraw(v3mesh_t mesh);
 void v3meshfree(v3mesh_t mesh);
 v3mesh_t v3meshfromlist(int len, vector3_t list[len][3], int color);
+matrix4x4_t getCameraMatrix();
+matrix4x4_t getProjectionMatrix();
+matrix4x4_t getRotationZMatrix();
+matrix4x4_t getRotationXMatrix();
+matrix4x4_t getTranslationMatrix();
 
 int main() {
 
@@ -104,7 +109,7 @@ int main() {
 
   };
 
-  v3mesh_t mesh = v3meshfromlist(12, list, 0xFF00FF);
+  v3mesh_t mesh = v3meshfromlist(12, list, 0xFFFFFF);
 
   int i = 0;
   while (!quit) {
@@ -129,7 +134,7 @@ int main() {
     clear(0x0);
 
     // v3cube(p0, p1, p2, p3, p4, p5, p6, p7, 0xFFFFFF);
-    v3mesh(mesh);
+    v3meshdraw(mesh);
 
     //  m4x4print(A);
 
@@ -153,53 +158,6 @@ int main() {
   return 0;
 }
 
-matrix4x4_t transformationMatrix() {
-  double zfar = 100;
-  double znear = 1;
-
-  double a = (double)SCREEN_HEIGHT / (double)SCREEN_WIDTH;
-  double f = 1 / tan(theta / 2);
-  double q = zfar / (zfar - znear);
-
-  double projectionMatrixEntries[4][4] = {
-      {a * f, 0, 0, 0},
-      {0, f, 0, 0},
-      {0, 0, q, 1},
-      {0, 0, -znear * q, 0},
-  };
-  matrix4x4_t projectionMatrix = m4x4create(projectionMatrixEntries);
-
-  phi += 0.1;
-  double rotationz[4][4] = {
-      {cos(phi), sin(phi), 0, 0},
-      {-sin(phi), cos(phi), 0, 0},
-      {0, 0, 1, 0},
-      {0, 0, 0, 1},
-  };
-  matrix4x4_t rotationzMatrix = m4x4create(rotationz);
-
-  double rotationx[4][4] = {
-      {1, 0, 0, 0},
-      {0, cos(phi), sin(phi), 0},
-      {0, -sin(phi), cos(phi), 0},
-      {0, 0, 0, 1},
-  };
-  matrix4x4_t rotationxMatrix = m4x4create(rotationx);
-
-  double translationMatrixEntries[4][4] = {
-      {1, 0, 0, 0},
-      {0, 1, 0, 0},
-      {0, 0, 1, 1},
-      {0, 0, 0, 1},
-  };
-  matrix4x4_t translationMatrix = m4x4create(translationMatrixEntries);
-
-  matrix4x4_t transformation = m4x4mul(4, rotationzMatrix, rotationxMatrix,
-                                       translationMatrix, projectionMatrix);
-
-  return transformation;
-}
-
 v3mesh_t v3meshfromlist(int len, vector3_t list[len][3], int color) {
   vector3_t **l = malloc(sizeof(vector3_t *) * len);
   for (int i = 0; i < len; i++)
@@ -216,22 +174,23 @@ v3mesh_t v3meshfromlist(int len, vector3_t list[len][3], int color) {
   return ret;
 }
 
-void v3mesh(v3mesh_t mesh) {
-  double zfar = 100;
-  double znear = 1;
-
-  double a = (double)SCREEN_HEIGHT / (double)SCREEN_WIDTH;
-  double f = 1 / tan(theta / 2);
-  double q = zfar / (zfar - znear);
-
+matrix4x4_t getCameraMatrix() {
   double cameraMatrixEntries[4][4] = {
       {1, 0, 0, camera.x},
       {0, 1, 0, camera.y},
       {0, 0, 1, camera.z},
       {0, 0, 0, 5},
   };
-  matrix4x4_t cameraMatrix = m4x4create(cameraMatrixEntries);
+  return m4x4create(cameraMatrixEntries);
+}
 
+matrix4x4_t getProjectionMatrix() {
+  double zfar = 100;
+  double znear = 1;
+
+  double a = (double)SCREEN_HEIGHT / (double)SCREEN_WIDTH;
+  double f = 1 / tan(theta / 2);
+  double q = zfar / (zfar - znear);
   double projectionMatrixEntries[4][4] = {
       {a * f, 0, 0, 0},
       {0, f, 0, 0},
@@ -239,35 +198,51 @@ void v3mesh(v3mesh_t mesh) {
       {0, 0, -znear * q, 0},
   };
 
-  matrix4x4_t projectionMatrix = m4x4create(projectionMatrixEntries);
+  return m4x4create(projectionMatrixEntries);
+}
 
-  phi += 0.01;
+matrix4x4_t getRotationZMatrix() {
   double rotationz[4][4] = {
       {cos(phi), sin(phi), 0, 0},
       {-sin(phi), cos(phi), 0, 0},
       {0, 0, 1, 0},
       {0, 0, 0, 1},
   };
-  matrix4x4_t rotationzMatrix = m4x4create(rotationz);
+  return m4x4create(rotationz);
+}
 
+matrix4x4_t getRotationXMatrix() {
   double rotationx[4][4] = {
       {1, 0, 0, 0},
       {0, cos(phi), sin(phi), 0},
       {0, -sin(phi), cos(phi), 0},
       {0, 0, 0, 1},
   };
-  matrix4x4_t rotationxMatrix = m4x4create(rotationx);
+  return m4x4create(rotationx);
+}
 
+matrix4x4_t getTranslationMatrix() {
   double translationMatrixEntries[4][4] = {
       {1, 0, 0, 0},
       {0, 1, 0, 0},
       {0, 0, 1, 2},
       {0, 0, 0, 2},
   };
-  matrix4x4_t translationMatrix = m4x4create(translationMatrixEntries);
+  return m4x4create(translationMatrixEntries);
+}
 
-  matrix4x4_t transform =
-      m4x4mul(4, rotationzMatrix, rotationxMatrix, translationMatrix, projectionMatrix);
+void v3meshdraw(v3mesh_t mesh) {
+
+  phi += 0.01;
+
+  matrix4x4_t cameraMatrix = getCameraMatrix();
+  matrix4x4_t projectionMatrix = getProjectionMatrix();
+  matrix4x4_t rotationzMatrix = getRotationZMatrix();
+  matrix4x4_t rotationxMatrix = getRotationXMatrix();
+  matrix4x4_t translationMatrix = getTranslationMatrix();
+
+  matrix4x4_t transform = m4x4mul(4, rotationzMatrix, rotationxMatrix,
+                                  translationMatrix, projectionMatrix);
 
   for (int i = 0; i < mesh.len; i++) {
     vector4_t p0 = v3tov4(mesh.list[i][0]);
@@ -284,7 +259,40 @@ void v3mesh(v3mesh_t mesh) {
     norm = NORM(norm);
 
     if (DOT(norm, SUB(p0, camera)) > 0) {
-      normv2triangle(v4tov2(p0), v4tov2(p1), v4tov2(p2), mesh.color);
+      
+      /*
+       * NEED TO DO MORE ADVANCED COLOR CALCULATION WITH LUMINENCE VALUE
+      */
+
+      vector3_t light = {1000, 0, -1};
+      light = NORM(light);
+      double luminence = DOT(light, norm);
+
+      double r = (double)((mesh.color & 0xFF0000) >> 16) / 255;
+      double g = (double)((mesh.color & 0x00FF00) >> 8) / 255;
+      double b = (double)((mesh.color & 0x0000FF)) / 255;
+
+      double M = MAX(MAX(r, g), b);
+      double m = MIN(MIN(r, g), b);
+      double C = M - m;
+
+      double h = 0;
+      if (M == r)
+        h = fmod((g - b) / C, 6);
+      else if (M == g)
+        h = (b - r) / C + 2;
+      else if (M == b)
+        h = (r - g) / C + 4;
+      h *= PI / 3;
+
+      double intensity = (r + g + b) / 3;
+
+      // color = r << 16 | g << 8 | b;
+
+      int color = mesh.color;
+      color = (color & 0x7E7E7E) << (int)(luminence * 2);
+
+      normv2triangle(v4tov2(p0), v4tov2(p1), v4tov2(p2), color);
     }
   }
 }
@@ -443,11 +451,6 @@ vector2_t v2NormalizedToScreen(vector2_t v) {
 }
 
 void triangle(int x0, int y0, int x1, int y1, int x2, int y2, int color) {
-#ifdef DEBUG
-  line(x0, y0, x1, y1, color);
-  line(x1, y1, x2, y2, color);
-  line(x0, y0, x2, y2, color);
-#else
 
   if (y1 > y0) {
     triangle(x1, y1, x0, y0, x2, y2, color);
@@ -544,6 +547,11 @@ void triangle(int x0, int y0, int x1, int y1, int x2, int y2, int color) {
   y0 = y0t;
   y1 = y1t;
   y2 = y2t;
+
+#ifdef DEBUG
+  line(x0, y0, x1, y1, 0);
+  line(x1, y1, x2, y2, 0);
+  line(x0, y0, x2, y2, 0);
 #endif
 }
 

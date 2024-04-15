@@ -42,6 +42,8 @@ typedef struct matrix4x4_t {
 #define SUB(v, u)                                                              \
   (vector3_t) { v.x - u.x, v.y - u.y, v.z - u.z }
 
+#define LEN(u) (sqrtf(u.x * u.x + u.y * u.y + u.z * u.z))
+
 static inline vector2_t v3tov2(vector3_t v) {
   return (vector2_t){v.x / v.z, v.y / v.z};
 }
