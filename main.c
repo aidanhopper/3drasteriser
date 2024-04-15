@@ -58,8 +58,8 @@ v3mesh_t v3meshfromlist(int tlen, int vlen, int tris[tlen][3],
                         vector3_t verts[vlen], int color);
 matrix4x4_t getCameraMatrix();
 matrix4x4_t getProjectionMatrix();
-matrix4x4_t getRotationZMatrix();
-matrix4x4_t getRotationXMatrix();
+matrix4x4_t getRotationZMatrix(double angle);
+matrix4x4_t getRotationXMatrix(double angle);
 matrix4x4_t getTranslationMatrix();
 v3mesh_t loadobjfile(char *path);
 
@@ -117,7 +117,7 @@ int main() {
 
   // v3mesh_t mesh = v3meshfromlist(12, 8, triangles, vertices, 0xFFFFFF);
 
-  v3mesh_t mesh = loadobjfile("VideoShip.obj");
+  v3mesh_t mesh = loadobjfile("teapot.obj");
   mesh.color = 0x83EECD;
 
   int i = 0;
@@ -284,21 +284,21 @@ matrix4x4_t getProjectionMatrix() {
   return m4x4create(projectionMatrixEntries);
 }
 
-matrix4x4_t getRotationZMatrix() {
+matrix4x4_t getRotationZMatrix(double angle) {
   double rotationz[4][4] = {
-      {cos(phi), sin(phi), 0, 0},
-      {-sin(phi), cos(phi), 0, 0},
+      {cos(angle), sin(angle), 0, 0},
+      {-sin(angle), cos(angle), 0, 0},
       {0, 0, 1, 0},
       {0, 0, 0, 1},
   };
   return m4x4create(rotationz);
 }
 
-matrix4x4_t getRotationXMatrix() {
+matrix4x4_t getRotationXMatrix(double angle) {
   double rotationx[4][4] = {
       {1, 0, 0, 0},
-      {0, cos(phi), sin(phi), 0},
-      {0, -sin(phi), cos(phi), 0},
+      {0, cos(angle), sin(angle), 0},
+      {0, -sin(angle), cos(angle), 0},
       {0, 0, 0, 1},
   };
   return m4x4create(rotationx);
@@ -428,8 +428,8 @@ void v3meshdraw(v3mesh_t mesh) {
 
   matrix4x4_t cameraMatrix = getCameraMatrix();
   matrix4x4_t projectionMatrix = getProjectionMatrix();
-  matrix4x4_t rotationzMatrix = getRotationZMatrix();
-  matrix4x4_t rotationxMatrix = getRotationXMatrix();
+  matrix4x4_t rotationzMatrix = getRotationZMatrix(phi);
+  matrix4x4_t rotationxMatrix = getRotationXMatrix(phi/2);
   matrix4x4_t translationMatrix = getTranslationMatrix();
 
   matrix4x4_t transform = m4x4mul(4, rotationzMatrix, rotationxMatrix,
