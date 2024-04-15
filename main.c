@@ -14,8 +14,10 @@
 //#define DEBUG
 
 typedef struct v3mesh_t {
-  vector3_t **list;
-  int len;
+  vector3_t *vertices;
+  int **triangles;
+  int vlen;
+  int tlen;
   int color;
 } v3mesh_t;
 
@@ -52,12 +54,14 @@ void normv2triangle(vector2_t u, vector2_t v, vector2_t w, int color);
 matrix4x4_t transformationMatrix();
 void v3meshdraw(v3mesh_t mesh);
 void v3meshfree(v3mesh_t mesh);
-v3mesh_t v3meshfromlist(int len, vector3_t list[len][3], int color);
+v3mesh_t v3meshfromlist(int tlen, int vlen, int tris[tlen][3],
+                        vector3_t verts[vlen], int color);
 matrix4x4_t getCameraMatrix();
 matrix4x4_t getProjectionMatrix();
 matrix4x4_t getRotationZMatrix();
 matrix4x4_t getRotationXMatrix();
 matrix4x4_t getTranslationMatrix();
+v3mesh_t loadobjfile(char *path);
 
 int main() {
 
@@ -82,34 +86,39 @@ int main() {
   vector3_t p6 = {0, 1, 1};
   vector3_t p7 = {1, 1, 1};
 
-  vector3_t list[12][3] = {
+  vector3_t vertices[8] = {p0, p1, p2, p3, p4, p5, p6, p7};
+
+  int triangles[12][3] = {
       // front
-      {p0, p3, p1},
-      {p0, p2, p3},
+      {0, 3, 1},
+      {0, 2, 3},
 
       // bottom
-      {p5, p4, p0},
-      {p5, p0, p1},
+      {5, 4, 0},
+      {5, 0, 1},
 
       // back
-      {p5, p7, p6},
-      {p5, p6, p4},
+      {5, 7, 6},
+      {5, 6, 4},
 
       // top
-      {p2, p6, p7},
-      {p2, p7, p3},
+      {2, 6, 7},
+      {2, 7, 3},
 
       // left
-      {p4, p6, p2},
-      {p4, p2, p0},
+      {4, 6, 2},
+      {4, 2, 0},
 
       // right
-      {p1, p3, p7},
-      {p1, p7, p5},
+      {1, 3, 7},
+      {1, 7, 5},
 
   };
 
-  v3mesh_t mesh = v3meshfromlist(12, list, 0x8CeefD);
+  // v3mesh_t mesh = v3meshfromlist(12, 8, triangles, vertices, 0xFFFFFF);
+
+  v3mesh_t mesh = loadobjfile("VideoShip.obj");
+  mesh.color = 0x83EECD;
 
   int i = 0;
   while (!quit) {
@@ -158,18 +167,92 @@ int main() {
   return 0;
 }
 
-v3mesh_t v3meshfromlist(int len, vector3_t list[len][3], int color) {
-  vector3_t **l = malloc(sizeof(vector3_t *) * len);
-  for (int i = 0; i < len; i++)
-    l[i] = malloc(sizeof(vector3_t) * 3);
+v3mesh_t loadobjfile(char *path) {
+  v3mesh_t ret;
+  int tlen = 0;
+  int vlen = 0;
+  size_t filelen = 0;
+  int read;
 
-  for (int i = 0; i < len; i++)
+  char *line;
+  FILE *f = fopen(path, "r");
+  if (f == NULL)
+    return ret;
+
+  while ((read = getline(&line, &filelen, f)) != -1) {
+    if (line[0] == 'v')
+      vlen++;
+    else if (line[0] == 'f')
+      tlen++;
+  }
+
+  fclose(f);
+  if (line)
+    free(line);
+
+  f = fopen(path, "r");
+  filelen = 0;
+  read = 0;
+
+  int triangles[tlen][3];
+  vector3_t vertices[vlen];
+  int v = 0;
+  int t = 0;
+  while ((read = getline(&line, &filelen, f)) != -1) {
+    char *tok = strtok(line, " ");
+    if (tok[0] == 'v') {
+      double x, y, z;
+      tok = strtok(NULL, " ");
+      sscanf(tok, "%lf", &x);
+      tok = strtok(NULL, " ");
+      sscanf(tok, "%lf", &y);
+      tok = strtok(NULL, " ");
+      sscanf(tok, "%lf", &z);
+      vertices[v++] = (vector3_t){x, y, z};
+    } else if (tok[0] == 'f') {
+      int p0, p1, p2;
+      tok = strtok(NULL, " ");
+      sscanf(tok, "%d", &p0);
+      tok = strtok(NULL, " ");
+      sscanf(tok, "%d", &p1);
+      tok = strtok(NULL, " ");
+      sscanf(tok, "%d", &p2);
+      triangles[t][0] = p0-1;
+      triangles[t][1] = p1-1;
+      triangles[t][2] = p2-1;
+      t++;
+    }
+  }
+
+  fclose(f);
+  if (line)
+    free(line);
+
+  ret = v3meshfromlist(tlen, vlen, triangles, vertices, 0xFFFFFF);
+
+  return ret;
+}
+
+v3mesh_t v3meshfromlist(int tlen, int vlen, int tris[tlen][3],
+                        vector3_t verts[vlen], int color) {
+
+  int **triangles = malloc(sizeof(int *) * tlen);
+  for (int i = 0; i < tlen; i++)
+    triangles[i] = malloc(sizeof(int) * 3);
+
+  for (int i = 0; i < tlen; i++)
     for (int j = 0; j < 3; j++)
-      l[i][j] = list[i][j];
+      triangles[i][j] = tris[i][j];
+
+  vector3_t *vertices = malloc(sizeof(vector3_t) * vlen);
+  for (int i = 0; i < vlen; i++)
+    vertices[i] = verts[i];
 
   v3mesh_t ret;
-  ret.list = l;
-  ret.len = len;
+  ret.triangles = triangles;
+  ret.tlen = tlen;
+  ret.vertices = vertices;
+  ret.vlen = vlen;
   ret.color = color;
   return ret;
 }
@@ -226,7 +309,7 @@ matrix4x4_t getTranslationMatrix() {
       {1, 0, 0, 0},
       {0, 1, 0, 0},
       {0, 0, 1, 2},
-      {0, 0, 0, 2},
+      {0, 0, 0, 12},
   };
   return m4x4create(translationMatrixEntries);
 }
@@ -317,6 +400,28 @@ int hsvtohex(double hue, double saturation, double value) {
   return color;
 };
 
+int v4cmpz(const void *u, const void *v) {
+  vector4_t *v4u = (vector4_t *)u;
+  vector4_t *v4v = (vector4_t *)v;
+
+  double z00 = v4u[0].z;
+  double z01 = v4u[1].z;
+  double z02 = v4u[2].z;
+
+  double z10 = v4v[0].z;
+  double z11 = v4v[1].z;
+  double z12 = v4v[2].z;
+
+  double z0mid = (z00 + z01 + z02)/3;
+  double z1mid = (z10 + z11 + z12)/3;
+
+  if (z0mid < z1mid)
+    return -1;
+  if (z0mid > z1mid)
+    return 1;
+  return 0;
+}
+
 void v3meshdraw(v3mesh_t mesh) {
 
   phi += 0.01;
@@ -330,10 +435,13 @@ void v3meshdraw(v3mesh_t mesh) {
   matrix4x4_t transform = m4x4mul(4, rotationzMatrix, rotationxMatrix,
                                   translationMatrix, projectionMatrix);
 
-  for (int i = 0; i < mesh.len; i++) {
-    vector4_t p0 = v3tov4(mesh.list[i][0]);
-    vector4_t p1 = v3tov4(mesh.list[i][1]);
-    vector4_t p2 = v3tov4(mesh.list[i][2]);
+  vector4_t draworder[mesh.tlen][3];
+  int drawcount = 0;
+
+  for (int i = 0; i < mesh.tlen; i++) {
+    vector4_t p0 = v3tov4(mesh.vertices[mesh.triangles[i][0]]);
+    vector4_t p1 = v3tov4(mesh.vertices[mesh.triangles[i][1]]);
+    vector4_t p2 = v3tov4(mesh.vertices[mesh.triangles[i][2]]);
 
     p0 = v4m4x4mul(p0, transform);
     p1 = v4m4x4mul(p1, transform);
@@ -354,20 +462,49 @@ void v3meshdraw(v3mesh_t mesh) {
       hextohsv(mesh.color, &hue, &saturation, &value);
 
       value *= MAX(luminence, 0.4);
-      saturation *= MAX(luminence, 0.4);
+      // hue *= MAX(luminence, 0.4);
 
       int color = hsvtohex(hue, saturation, value);
 
+      // normv2triangle(v4tov2(p0), v4tov2(p1), v4tov2(p2), color);
 
-      normv2triangle(v4tov2(p0), v4tov2(p1), v4tov2(p2), color);
+      draworder[drawcount][0] = p0;
+      draworder[drawcount][1] = p1;
+      draworder[drawcount][2] = p2;
+      drawcount++;
     }
+  }
+
+  qsort(draworder, drawcount, sizeof(vector4_t) * 3, v4cmpz);
+  for (int i = 0; i < drawcount; i++) {
+    vector4_t p0 = draworder[i][0];
+    vector4_t p1 = draworder[i][1];
+    vector4_t p2 = draworder[i][2];
+
+    vector3_t line1 = SUB(p1, p0);
+    vector3_t line2 = SUB(p2, p0);
+    vector3_t norm = CROSS(line1, line2);
+    norm = NORM(norm);
+
+    vector3_t light = {0, 0, -1};
+    light = NORM(light);
+    double luminence = DOT(light, norm);
+
+    double hue, saturation, value;
+    hextohsv(mesh.color, &hue, &saturation, &value);
+
+    value *= MAX(luminence, 0.4);
+
+    int color = hsvtohex(hue, saturation, value);
+    normv2triangle(v4tov2(p0), v4tov2(p1), v4tov2(p2), color);
   }
 }
 
 void v3meshfree(v3mesh_t mesh) {
-  for (int i = 0; i < mesh.len; i++)
-    free(mesh.list[i]);
-  free(mesh.list);
+  for (int i = 0; i < mesh.tlen; i++)
+    free(mesh.triangles[i]);
+  free(mesh.triangles);
+  free(mesh.vertices);
 }
 
 vector3_t project(vector3_t v) { return v; }
@@ -518,7 +655,6 @@ vector2_t v2NormalizedToScreen(vector2_t v) {
 }
 
 void triangle(int x0, int y0, int x1, int y1, int x2, int y2, int color) {
-
   if (y1 > y0) {
     triangle(x1, y1, x0, y0, x2, y2, color);
     return;
@@ -616,9 +752,9 @@ void triangle(int x0, int y0, int x1, int y1, int x2, int y2, int color) {
   y2 = y2t;
 
 #ifdef DEBUG
-  line(x0, y0, x1, y1, 0);
-  line(x1, y1, x2, y2, 0);
-  line(x0, y0, x2, y2, 0);
+  line(x0, y0, x1, y1, 0xFFFFFF);
+  line(x1, y1, x2, y2, 0xFFFFFF);
+  line(x0, y0, x2, y2, 0xFFFFFF);
 #endif
 }
 
