@@ -11,7 +11,7 @@
 #define MIN(x, y) x > y ? y : x
 #define MAX(x, y) x < y ? y : x
 
-#define DEBUG
+//#define DEBUG
 
 typedef struct v3mesh_t {
   vector3_t **list;
@@ -109,7 +109,7 @@ int main() {
 
   };
 
-  v3mesh_t mesh = v3meshfromlist(12, list, 0xFFFFFF);
+  v3mesh_t mesh = v3meshfromlist(12, list, 0x8CeefD);
 
   int i = 0;
   while (!quit) {
@@ -231,6 +231,92 @@ matrix4x4_t getTranslationMatrix() {
   return m4x4create(translationMatrixEntries);
 }
 
+void hextohsv(int color, double *hue, double *saturation, double *value) {
+  double r = (double)((color & 0xFF0000) >> 16) / 255;
+  double g = (double)((color & 0x00FF00) >> 8) / 255;
+  double b = (double)((color & 0x0000FF)) / 255;
+  // printf("%lf %lf %lf\n", r, g, b);
+
+  double cmax = MAX(MAX(r, g), b);
+  double cmin = MIN(MIN(r, g), b);
+  double range = cmax - cmin;
+
+  *hue = 0;
+  if (range != 0) {
+    if (cmax == r)
+      *hue = 60 * ((g - b) / range);
+    else if (cmax == g)
+      *hue = 60 * ((b - r) / range + 2);
+    else if (cmax == b)
+      *hue = 60 * ((r - g) / range + 4);
+  }
+  if (*hue < 0)
+    *hue += 360;
+
+  *saturation = 0;
+  if (cmax != 0)
+    *saturation = (range / cmax);
+
+  *value = cmax;
+}
+
+int hsvtohex(double hue, double saturation, double value) {
+  double H = hue, S = saturation, V = value, P, Q, T, fract;
+  double r, g, b;
+
+  (H == 360.) ? (H = 0.) : (H /= 60.);
+  fract = H - floor(H);
+
+  P = V * (1. - S);
+  Q = V * (1. - S * fract);
+  T = V * (1. - S * (1. - fract));
+
+  if (0. <= H && H < 1.) {
+    // RGB = (rgb){.r = V, .g = T, .b = P};
+    r = V;
+    g = T;
+    b = P;
+  } else if (1. <= H && H < 2.) {
+    // RGB = (rgb){.r = Q, .g = V, .b = P};
+    r = Q;
+    g = V;
+    b = P;
+  } else if (2. <= H && H < 3.) {
+    // RGB = (rgb){.r = P, .g = V, .b = T};
+    r = P;
+    g = V;
+    b = T;
+  } else if (3. <= H && H < 4.) {
+    // RGB = (rgb){.r = P, .g = Q, .b = V};
+    r = P;
+    g = Q;
+    b = V;
+  } else if (4. <= H && H < 5.) {
+    // RGB = (rgb){.r = T, .g = P, .b = V};
+    r = T;
+    g = P;
+    b = V;
+  } else if (5. <= H && H < 6.) {
+    // RGB = (rgb){.r = V, .g = P, .b = Q};
+    r = V;
+    g = P;
+    b = Q;
+  } else {
+    // RGB = (rgb){.r = 0., .g = 0., .b = 0.};
+    r = 0;
+    g = 0;
+    b = 0;
+  }
+
+  r *= 255;
+  g *= 255;
+  b *= 255;
+
+  int color = (int)r << 16 | (int)g << 8 | (int)b;
+
+  return color;
+};
+
 void v3meshdraw(v3mesh_t mesh) {
 
   phi += 0.01;
@@ -259,38 +345,19 @@ void v3meshdraw(v3mesh_t mesh) {
     norm = NORM(norm);
 
     if (DOT(norm, SUB(p0, camera)) > 0) {
-      
-      /*
-       * NEED TO DO MORE ADVANCED COLOR CALCULATION WITH LUMINENCE VALUE
-      */
 
-      vector3_t light = {1000, 0, -1};
+      vector3_t light = {0, 0, -1};
       light = NORM(light);
       double luminence = DOT(light, norm);
 
-      double r = (double)((mesh.color & 0xFF0000) >> 16) / 255;
-      double g = (double)((mesh.color & 0x00FF00) >> 8) / 255;
-      double b = (double)((mesh.color & 0x0000FF)) / 255;
+      double hue, saturation, value;
+      hextohsv(mesh.color, &hue, &saturation, &value);
 
-      double M = MAX(MAX(r, g), b);
-      double m = MIN(MIN(r, g), b);
-      double C = M - m;
+      value *= MAX(luminence, 0.4);
+      saturation *= MAX(luminence, 0.4);
 
-      double h = 0;
-      if (M == r)
-        h = fmod((g - b) / C, 6);
-      else if (M == g)
-        h = (b - r) / C + 2;
-      else if (M == b)
-        h = (r - g) / C + 4;
-      h *= PI / 3;
+      int color = hsvtohex(hue, saturation, value);
 
-      double intensity = (r + g + b) / 3;
-
-      // color = r << 16 | g << 8 | b;
-
-      int color = mesh.color;
-      color = (color & 0x7E7E7E) << (int)(luminence * 2);
 
       normv2triangle(v4tov2(p0), v4tov2(p1), v4tov2(p2), color);
     }
