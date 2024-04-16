@@ -24,7 +24,7 @@ typedef struct matrix4x4_t {
   double entries[4][4];
 } matrix4x4_t;
 
-#define DOT(v, u) v.x *u.x + v.y *u.y + v.z *u.z
+#define DOT(v, u) (v.x * u.x + v.y * u.y + v.z * u.z)
 #define CROSS(v, u)                                                            \
   (vector3_t) {                                                                \
     (v.y * u.z - v.z * u.y), -(v.x * u.z - v.z * u.x), (v.x * u.y - v.y * u.x) \
@@ -43,6 +43,7 @@ typedef struct matrix4x4_t {
   (vector3_t) { v.x - u.x, v.y - u.y, v.z - u.z }
 
 #define LEN(u) (sqrtf(u.x * u.x + u.y * u.y + u.z * u.z))
+#define MUL(u, s) (vector3_t){u.x * s, u.y * s, u.z * s}
 
 static inline vector2_t v3tov2(vector3_t v) {
   return (vector2_t){v.x / v.z, v.y / v.z};
