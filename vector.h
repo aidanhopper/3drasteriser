@@ -45,6 +45,10 @@ typedef struct matrix4x4_t {
 #define LEN(u) (sqrtf(u.x * u.x + u.y * u.y + u.z * u.z))
 #define MUL(u, s) (vector3_t){u.x * s, u.y * s, u.z * s}
 
+
+static inline void m4x4print(matrix4x4_t A);
+static inline vector3_t v3m4x4mul(vector3_t v, matrix4x4_t A);
+
 static inline vector2_t v3tov2(vector3_t v) {
   return (vector2_t){v.x / v.z, v.y / v.z};
 }
@@ -73,8 +77,8 @@ static inline vector4_t v4m4x4mul(vector4_t v, matrix4x4_t A) {
           A.entries[2][2] * v.z + A.entries[3][2] * v.w;
   ret.w = A.entries[0][3] * v.x + A.entries[1][3] * v.y +
           A.entries[2][3] * v.z + A.entries[3][3] * v.w;
+
   return ret;
-  return v;
 }
 
 static inline vector4_t m4x4v4mul(matrix4x4_t A, vector4_t v) {
@@ -157,9 +161,21 @@ static inline vector2_t v4tov2(vector4_t proj) {
   }
   ret.x = p.x;
   ret.y = p.y;
+  /*
   if (p.z != 0) {
     ret.x /= p.z;
     ret.y /= p.z;
   }
+  */
   return ret;
+}
+
+static inline vector3_t v4tov3(vector4_t v) {
+  return (vector3_t) {
+    v.x, v.y, v.z
+  };
+}
+
+static inline vector3_t v3m4x4mul(vector3_t v, matrix4x4_t A) {
+  return v4tov3(v4m4x4mul(v3tov4(v), A));
 }

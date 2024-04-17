@@ -25,11 +25,11 @@ SDL_Window *window = NULL;
 SDL_Renderer *renderer = NULL;
 SDL_Texture *texture = NULL;
 SDL_Surface *surface = NULL;
-double theta = PI / 1.5;
+double theta = PI / 4;
 double phi = 0;
-double sensitivity = 0.4;
+double alpha = 0;
+double sensitivity = 0.8;
 vector3_t camera = {0, 0, 0};
-vector3_t lookdirection = {0, 0, 1};
 
 int init();
 int cleanup();
@@ -55,7 +55,7 @@ void v3meshdraw(v3mesh_t mesh);
 void v3meshfree(v3mesh_t mesh);
 v3mesh_t v3meshfromlist(int tlen, int vlen, int tris[tlen][3],
                         vector3_t verts[vlen], int color);
-matrix4x4_t getCameraMatrix();
+matrix4x4_t getCameraMatrix(vector3_t camera);
 matrix4x4_t getProjectionMatrix();
 matrix4x4_t getRotationZMatrix(double angle);
 matrix4x4_t getRotationXMatrix(double angle);
@@ -63,6 +63,7 @@ matrix4x4_t getTranslationMatrix(double x, double y, double z);
 v3mesh_t loadobjfile(char *path);
 matrix4x4_t getPointAtMatrix(vector3_t pos, vector3_t target, vector3_t up);
 matrix4x4_t getPointAtMatrixInverse(matrix4x4_t p);
+matrix4x4_t getRotationYMatrix(double angle);
 
 int main() {
 
@@ -78,7 +79,7 @@ int main() {
   int quit = 0;
   SDL_Event e;
 
-  v3mesh_t mesh = loadobjfile("axis.obj");
+  v3mesh_t mesh = loadobjfile("teapot.obj");
   mesh.color = 0xFFFFFF;
 
   unsigned int starttime = SDL_GetTicks();
@@ -91,23 +92,45 @@ int main() {
     }
     unsigned int currenttime = SDL_GetTicks();
     double elapsedtime = (double)(currenttime - starttime) / 1000;
-    if (keystates[SDL_SCANCODE_UP])
-      camera.y += 0.1;
-    if (keystates[SDL_SCANCODE_DOWN])
-      camera.y -= 0.1;
-    if (keystates[SDL_SCANCODE_A])
-      camera.x -= 0.1;
-    if (keystates[SDL_SCANCODE_D])
-      camera.x += 0.1;
-    if (keystates[SDL_SCANCODE_W])
-      camera.z += 0.1;
-    if (keystates[SDL_SCANCODE_S])
-      camera.z -= 0.1;
+    vector3_t velocity = {0, 0, 0};
+    if (keystates[SDL_SCANCODE_UP]) {
+      velocity.y += 0.1;
+    }
+    if (keystates[SDL_SCANCODE_DOWN]) {
+      velocity.y -= 0.1;
+    }
+    if (keystates[SDL_SCANCODE_A]) {
+      velocity.x -= 0.1;
+    }
+    if (keystates[SDL_SCANCODE_D]) {
+      velocity.x += 0.1;
+    }
+    if (keystates[SDL_SCANCODE_W]) {
+      velocity.z += 0.1;
+      // vector3_t velocityscaled = MUL(forward, 0.1);
+      // velocity = ADD(velocity, velocityscaled);
+    }
+    if (keystates[SDL_SCANCODE_S]) {
+      // vector3_t velocityscaled = MUL(forward, -0.1);
+      // velocity = ADD(velocity, velocityscaled);
+      velocity.z -= 0.1;
+    }
+
+    camera = ADD(camera, velocity);
+
+    if (keystates[SDL_SCANCODE_LEFT])
+      phi += -0.01;
+    if (keystates[SDL_SCANCODE_RIGHT])
+      phi -= -0.01;
 
     handleMouse();
 
     clear(0x0);
 
+    vector2_t p0 = {-0.019036, -0.020741};
+    vector2_t p1 = {1, -1};
+    vector2_t p2 = {1, 1};
+    // normv2triangle(p0, p1, p2, 0xFF0000);
     v3meshdraw(mesh);
 
     present();
@@ -211,98 +234,6 @@ v3mesh_t v3meshfromlist(int tlen, int vlen, int tris[tlen][3],
   ret.vlen = vlen;
   ret.color = color;
   return ret;
-}
-
-matrix4x4_t getCameraMatrix() {
-  double cameraMatrixEntries[4][4] = {
-      {1, 0, 0, camera.x},
-      {0, 1, 0, camera.y},
-      {0, 0, 1, camera.z},
-      {0, 0, 0, 5},
-  };
-  return m4x4create(cameraMatrixEntries);
-}
-
-matrix4x4_t getProjectionMatrix() {
-  double zfar = 100;
-  double znear = 1;
-
-  double a = (double)SCREEN_HEIGHT / (double)SCREEN_WIDTH;
-  double f = 1 / tan(theta / 2);
-  double q = zfar / (zfar - znear);
-  double projectionMatrixEntries[4][4] = {
-      {a * f, 0, 0, 0},
-      {0, f, 0, 0},
-      {0, 0, q, 1},
-      {0, 0, -znear * q, 0},
-  };
-
-  return m4x4create(projectionMatrixEntries);
-}
-
-matrix4x4_t getRotationZMatrix(double angle) {
-  double rotationz[4][4] = {
-      {cos(angle), sin(angle), 0, 0},
-      {-sin(angle), cos(angle), 0, 0},
-      {0, 0, 1, 0},
-      {0, 0, 0, 1},
-  };
-  return m4x4create(rotationz);
-}
-
-matrix4x4_t getRotationXMatrix(double angle) {
-  double rotationx[4][4] = {
-      {1, 0, 0, 0},
-      {0, cos(angle), sin(angle), 0},
-      {0, -sin(angle), cos(angle), 0},
-      {0, 0, 0, 1},
-  };
-  return m4x4create(rotationx);
-}
-
-matrix4x4_t getTranslationMatrix(double x, double y, double z) {
-  double translationMatrixEntries[4][4] = {
-      {1, 0, 0, 0},
-      {0, 1, 0, 0},
-      {0, 0, 1, 0},
-      {x, y, z, 1},
-  };
-  return m4x4create(translationMatrixEntries);
-}
-
-matrix4x4_t getPointAtMatrix(vector3_t pos, vector3_t target, vector3_t up) {
-
-  vector3_t newforward = SUB(target, pos);
-  newforward = NORM(newforward);
-
-  vector3_t a = MUL(newforward, DOT(up, newforward));
-  vector3_t newup = SUB(up, a);
-  newup = NORM(newup);
-
-  vector3_t newright = CROSS(newup, newforward);
-
-  double pointAtMatrixEntries[4][4] = {
-      {newright.x, newright.y, newright.z, 0},
-      {newup.x, newup.y, newup.z, 0},
-      {newforward.x, newforward.y, newforward.z, 0},
-      {pos.x, pos.y, pos.z, 1}};
-  return m4x4create(pointAtMatrixEntries);
-}
-
-matrix4x4_t getPointAtMatrixInverse(matrix4x4_t p) {
-  double inverse[4][4] = {
-      {p.entries[0][0], p.entries[1][0], p.entries[2][0], 0},
-      {p.entries[0][1], p.entries[1][1], p.entries[2][1], 0},
-      {p.entries[0][2], p.entries[1][2], p.entries[2][2], 0},
-      {-(p.entries[3][0] * p.entries[0][0] + p.entries[3][1] * p.entries[1][0] +
-         p.entries[3][2] * p.entries[2][0]),
-       -(p.entries[3][0] * p.entries[0][1] + p.entries[3][1] * p.entries[1][1] +
-         p.entries[3][2] * p.entries[2][1]),
-       -(p.entries[3][0] * p.entries[0][2] + p.entries[3][1] * p.entries[1][2] +
-         p.entries[3][2] * p.entries[2][2]),
-       1},
-  };
-  return m4x4create(inverse);
 }
 
 void hextohsv(int color, double *hue, double *saturation, double *value) {
@@ -415,25 +346,78 @@ int v4cmpz(const void *u, const void *v) {
 
 void v3meshdraw(v3mesh_t mesh) {
 
-  phi = 0;
+  double entries1[4][4] = {
+      {1, 0, 0, 0},
+      {0, 1, 0, 0},
+      {0, 0, 1, 0},
+      {0, 0, 0, 1},
+  };
+  matrix4x4_t transform1 = m4x4create(entries1);
 
-  matrix4x4_t projectionMatrix = getProjectionMatrix();
-  matrix4x4_t rotationzMatrix = getRotationZMatrix(phi);
-  matrix4x4_t rotationxMatrix = getRotationXMatrix(phi / 2);
-  matrix4x4_t translationMatrix = getTranslationMatrix(10, 0, 15);
+  double entries2[4][4] = {
+      {1, 0, 0, 0},
+      {0, 1, 0, 0},
+      {0, 0, 1, 0},
+      {-camera.x, -camera.y, -camera.z + 30, 1},
+  };
+  matrix4x4_t transform2 = m4x4create(entries2);
 
-  lookdirection = (vector3_t){0, 0, 1};
-  vector3_t up = {0, 1, 0};
-  vector3_t target = ADD(camera, lookdirection);
+  double entries3[4][4] = {
+      {cos(phi), 0, sin(phi), 0},
+      {0, 1, 0, 0},
+      {-sin(phi), 0, cos(phi), 0},
+      {0, 0, 0, 0},
+  };
+  matrix4x4_t transform3 = m4x4create(entries3);
 
-  matrix4x4_t cameraMatrix = getPointAtMatrix(camera, target, up);
-  matrix4x4_t view = getPointAtMatrixInverse(cameraMatrix);
+  double entries4[4][4] = {
+      {1, 0, 0, 0},
+      {0, cos(alpha), sin(alpha), 0},
+      {0, -sin(alpha), cos(alpha), 0},
+      {0, 0, 0, 1},
+  };
+  matrix4x4_t transform4 = m4x4create(entries4);
 
-  matrix4x4_t transform = m4x4mul(3, translationMatrix, view, projectionMatrix);
+  double far = 100;
+  double near = 1;
+  double a = (double)SCREEN_HEIGHT / (double)SCREEN_WIDTH;
+  double entries5[4][4] = {
+      {a / tan(theta / 2), 0, 0, 0},
+      {0, 1 / tan(theta / 2), 0, 0},
+      {0, 0, (far) / (far - near), 1},
+      {0, 0, (far * near) / (far - near), 0},
+  };
+  matrix4x4_t transform5 = m4x4create(entries5);
+
+  vector3_t Y = {0, 1, 0};
+  vector3_t target = {0, 0, -1};
+  // target = v3m4x4mul(target, transform3);
+  //
+  vector3_t eye = camera;
+
+  vector3_t forward = SUB(target, eye);
+  forward = NORM(forward);
+
+  vector3_t side = CROSS(forward, Y);
+  side = NORM(side);
+
+  vector3_t up = CROSS(side, forward);
+  up = NORM(up);
+
+  double entries6[4][4] = {
+      {side.x, side.y, side.z, -DOT(side, eye)},
+      {up.x, up.y, up.z, -DOT(up, eye)},
+      {-forward.x, -forward.y, -forward.z, -DOT(forward, eye)},
+      {0, 0, 0, 1},
+  };
+  matrix4x4_t transform6 = m4x4create(entries6);
+
+  matrix4x4_t transform = m4x4mul(3, transform2, transform6, transform5 );
+
   vector4_t draworder[mesh.tlen][3];
   int drawcount = 0;
-
   for (int i = 0; i < mesh.tlen; i++) {
+    // for (int i = 0; i < 1; i++) {
     vector4_t p0 = v3tov4(mesh.vertices[mesh.triangles[i][0]]);
     vector4_t p1 = v3tov4(mesh.vertices[mesh.triangles[i][1]]);
     vector4_t p2 = v3tov4(mesh.vertices[mesh.triangles[i][2]]);
@@ -447,7 +431,7 @@ void v3meshdraw(v3mesh_t mesh) {
     vector3_t norm = CROSS(line1, line2);
     norm = NORM(norm);
 
-    if (DOT(norm, SUB(p0, camera)) < 0) {
+    if (DOT(norm, p0) < 0) {
       draworder[drawcount][0] = p0;
       draworder[drawcount][1] = p1;
       draworder[drawcount][2] = p2;
@@ -458,10 +442,12 @@ void v3meshdraw(v3mesh_t mesh) {
   qsort(draworder, drawcount, sizeof(vector4_t) * 3, v4cmpz);
 
   for (int i = 0; i < drawcount; i++) {
+    // for (int i = 0; i < 1; i++) {
     vector4_t p0 = draworder[i][0];
     vector4_t p1 = draworder[i][1];
     vector4_t p2 = draworder[i][2];
 
+    v4print(p0);
     vector3_t line1 = SUB(p1, p0);
     vector3_t line2 = SUB(p2, p0);
     vector3_t norm = CROSS(line1, line2);
@@ -496,8 +482,22 @@ void handleMouse() {
   SDL_GetMouseState(&mouseX, &mouseY);
   int offsetX = mouseX - SCREEN_WIDTH / 2;
   int offsetY = mouseY - SCREEN_HEIGHT / 2;
+  /*
   SDL_WarpMouseInWindow(window, SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2);
   // theta = fmod(theta + offsetX * sensitivity / 100, (double)2 * PI);
+  if (offsetX > 2)
+    offsetX = 2;
+  if (offsetX < -2)
+    offsetX = -2;
+  phi += ((double)offsetX / 100)*sensitivity;
+
+  if (offsetY > 2)
+    offsetY = 2;
+  if (offsetY < -2)
+    offsetY = -2;
+  alpha -= ((double)offsetY / 100)*sensitivity;
+  */
+
   //  if ((fabs(phi + offsetY * sensitivity / 100) <= 2 * PI))
   //    phi = phi + offsetY * sensitivity / 100;
 }
@@ -545,6 +545,7 @@ void normv2line(vector2_t u, vector2_t v, int color) {
 }
 
 void normv2triangle(vector2_t u, vector2_t v, vector2_t w, int color) {
+  v2print(u);
   u = v2NormalizedToScreen(u);
   v = v2NormalizedToScreen(v);
   w = v2NormalizedToScreen(w);
@@ -636,6 +637,7 @@ vector2_t v2NormalizedToScreen(vector2_t v) {
 }
 
 void triangle(int x0, int y0, int x1, int y1, int x2, int y2, int color) {
+
   if (y1 > y0) {
     triangle(x1, y1, x0, y0, x2, y2, color);
     return;
