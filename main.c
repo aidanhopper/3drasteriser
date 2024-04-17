@@ -77,8 +77,6 @@ int main() {
   v3mesh_t mesh = loadobjfile("teapot.obj");
   mesh.color = 0xFFFFFF;
 
-  queue_t *queue = qcreate(100, sizeof(int));
-
   unsigned int starttime = SDL_GetTicks();
   while (!quit) {
 
@@ -412,6 +410,37 @@ void v3meshdraw(v3mesh_t mesh) {
     int color = hsvtohex(hue, saturation, value);
     normv2triangle(v4tov2(p0), v4tov2(p1), v4tov2(p2), color);
   }
+
+  /*
+   * NEED TO MAKE SURE THIS CODE WORKS PROPERLY BEFORE CLIPPING
+   *
+   *
+  v4queue_t *q = v4qcreate(3);
+  vector4_t p0 = {1, 2, 3, 4};
+  if (v4enq(q, p0))
+    printf("QUEUE IS FULL 0\n");
+  if (v4enq(q, p0))
+    printf("QUEUE IS FULL 1\n");
+
+  if (v4deq(q, &p0))
+    printf("QUEUE IS EMPTY 0\n");
+  if (v4deq(q, &p0))
+    printf("QUEUE IS EMPTY 1\n");
+  if (v4enq(q, p0))
+    printf("QUEUE IS FULL 0\n");
+  if (v4deq(q, &p0))
+    printf("QUEUE IS EMPTY 2\n");
+  if (v4deq(q, &p0))
+    printf("QUEUE IS EMPTY 3\n");
+
+  for (int i = q->tail ; i != q->head; i = (i + 1) % q->capacity)
+    v4print(q->list[i]);
+
+  v4qfree(q);
+  */
+
+
+
 }
 
 void v3meshfree(v3mesh_t mesh) {
