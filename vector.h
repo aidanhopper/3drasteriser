@@ -1,4 +1,5 @@
 #pragma once
+#include <math.h>
 #include <stdarg.h>
 #include <stdio.h>
 
@@ -43,11 +44,12 @@ typedef struct matrix4x4_t {
   (vector3_t) { v.x - u.x, v.y - u.y, v.z - u.z }
 
 #define LEN(u) (sqrtf(u.x * u.x + u.y * u.y + u.z * u.z))
-#define MUL(u, s) (vector3_t){u.x * s, u.y * s, u.z * s}
-
+#define MUL(u, s)                                                              \
+  (vector3_t) { u.x *s, u.y *s, u.z *s }
 
 static inline void m4x4print(matrix4x4_t A);
 static inline vector3_t v3m4x4mul(vector3_t v, matrix4x4_t A);
+static inline matrix4x4_t m4x4mul(int argcount, ...);
 
 static inline vector2_t v3tov2(vector3_t v) {
   return (vector2_t){v.x / v.z, v.y / v.z};
@@ -171,11 +173,60 @@ static inline vector2_t v4tov2(vector4_t proj) {
 }
 
 static inline vector3_t v4tov3(vector4_t v) {
-  return (vector3_t) {
-    v.x, v.y, v.z
-  };
+  return (vector3_t){v.x, v.y, v.z};
 }
 
 static inline vector3_t v3m4x4mul(vector3_t v, matrix4x4_t A) {
   return v4tov3(v4m4x4mul(v3tov4(v), A));
+}
+
+static inline matrix4x4_t createRotationMatrix(double x, double y, double z) {
+  double yrotation[4][4] = {
+      {cos(y), 0, sin(y), 0},
+      {0, 1, 0, 0},
+      {-sin(y), 0, cos(y), 0},
+      {0, 0, 0, 0},
+  };
+  matrix4x4_t yrot = m4x4create(yrotation);
+
+  double xrotation[4][4] = {
+      {1, 0, 0, 0},
+      {0, cos(x), -sin(x), 0},
+      {0, sin(x), cos(x), 0},
+      {0, 0, 0, 1},
+  };
+  matrix4x4_t xrot = m4x4create(xrotation);
+
+  double zrotation[4][4] = {
+      {cos(z), -sin(z), 0, 0},
+      {sin(z), cos(z), 0, 0},
+      {0, 0, 1, 0},
+      {0, 0, 0, 1},
+  };
+  matrix4x4_t zrot = m4x4create(zrotation);
+
+  return m4x4mul(3, xrot, yrot, zrot);
+}
+
+static inline matrix4x4_t createTranslationMatrix(double x, double y,
+                                                  double z) {
+
+  double entries2[4][4] = {
+      {1, 0, 0, 0},
+      {0, 1, 0, 0},
+      {0, 0, 1, 0},
+      {x, y, z, 1},
+  };
+  return m4x4create(entries2);
+}
+
+static inline matrix4x4_t createProjectionMatrix(double near, double far,
+                                                 double a, double fov) {
+  double entries5[4][4] = {
+      {a / tan(fov / 2), 0, 0, 0},
+      {0, 1 / tan(fov / 2), 0, 0},
+      {0, 0, (far) / (far - near), 1},
+      {0, 0, (far * near) / (far - near), 0},
+  };
+  return m4x4create(entries5);
 }

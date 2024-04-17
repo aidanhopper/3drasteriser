@@ -1,3 +1,4 @@
+#include "queue.h"
 #include "vector.h"
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_events.h>
@@ -25,11 +26,14 @@ SDL_Window *window = NULL;
 SDL_Renderer *renderer = NULL;
 SDL_Texture *texture = NULL;
 SDL_Surface *surface = NULL;
-double theta = PI / 4;
+double theta = PI / 3;
 double phi = 0;
 double alpha = 0;
-double sensitivity = 0.8;
+double sensitivity = 1;
 vector3_t camera = {0, 0, 0};
+vector3_t forward = {0, 0, -1};
+vector3_t up = {0, 1, 0};
+vector3_t right = {1, 0, 0};
 
 int init();
 int cleanup();
@@ -50,20 +54,11 @@ void v2line(vector2_t u, vector2_t v, int color);
 void normv2line(vector2_t u, vector2_t v, int color);
 vector3_t project(vector3_t v);
 void normv2triangle(vector2_t u, vector2_t v, vector2_t w, int color);
-matrix4x4_t transformationMatrix();
 void v3meshdraw(v3mesh_t mesh);
 void v3meshfree(v3mesh_t mesh);
 v3mesh_t v3meshfromlist(int tlen, int vlen, int tris[tlen][3],
                         vector3_t verts[vlen], int color);
-matrix4x4_t getCameraMatrix(vector3_t camera);
-matrix4x4_t getProjectionMatrix();
-matrix4x4_t getRotationZMatrix(double angle);
-matrix4x4_t getRotationXMatrix(double angle);
-matrix4x4_t getTranslationMatrix(double x, double y, double z);
 v3mesh_t loadobjfile(char *path);
-matrix4x4_t getPointAtMatrix(vector3_t pos, vector3_t target, vector3_t up);
-matrix4x4_t getPointAtMatrixInverse(matrix4x4_t p);
-matrix4x4_t getRotationYMatrix(double angle);
 
 int main() {
 
@@ -81,6 +76,8 @@ int main() {
 
   v3mesh_t mesh = loadobjfile("teapot.obj");
   mesh.color = 0xFFFFFF;
+
+  queue_t *queue = qcreate(100, sizeof(int));
 
   unsigned int starttime = SDL_GetTicks();
   while (!quit) {
@@ -100,20 +97,20 @@ int main() {
       velocity.y -= 0.1;
     }
     if (keystates[SDL_SCANCODE_A]) {
-      velocity.x -= 0.1;
+      vector3_t velocityscaled = MUL(right, 0.1);
+      velocity = ADD(velocity, velocityscaled);
     }
     if (keystates[SDL_SCANCODE_D]) {
-      velocity.x += 0.1;
+      vector3_t velocityscaled = MUL(right, -0.1);
+      velocity = ADD(velocity, velocityscaled);
     }
     if (keystates[SDL_SCANCODE_W]) {
-      velocity.z += 0.1;
-      // vector3_t velocityscaled = MUL(forward, 0.1);
-      // velocity = ADD(velocity, velocityscaled);
+      vector3_t velocityscaled = MUL(forward, 0.1);
+      velocity = ADD(velocity, velocityscaled);
     }
     if (keystates[SDL_SCANCODE_S]) {
-      // vector3_t velocityscaled = MUL(forward, -0.1);
-      // velocity = ADD(velocity, velocityscaled);
-      velocity.z -= 0.1;
+      vector3_t velocityscaled = MUL(forward, -0.1);
+      velocity = ADD(velocity, velocityscaled);
     }
 
     camera = ADD(camera, velocity);
@@ -240,7 +237,6 @@ void hextohsv(int color, double *hue, double *saturation, double *value) {
   double r = (double)((color & 0xFF0000) >> 16) / 255;
   double g = (double)((color & 0x00FF00) >> 8) / 255;
   double b = (double)((color & 0x0000FF)) / 255;
-  // printf("%lf %lf %lf\n", r, g, b);
 
   double cmax = MAX(MAX(r, g), b);
   double cmin = MIN(MIN(r, g), b);
@@ -346,73 +342,25 @@ int v4cmpz(const void *u, const void *v) {
 
 void v3meshdraw(v3mesh_t mesh) {
 
-  double entries1[4][4] = {
-      {1, 0, 0, 0},
-      {0, 1, 0, 0},
-      {0, 0, 1, 0},
-      {0, 0, 0, 1},
-  };
-  matrix4x4_t transform1 = m4x4create(entries1);
+  matrix4x4_t transform2 =
+      createTranslationMatrix(-camera.x, -camera.y, -camera.z + 30);
 
-  double entries2[4][4] = {
-      {1, 0, 0, 0},
-      {0, 1, 0, 0},
-      {0, 0, 1, 0},
-      {-camera.x, -camera.y, -camera.z + 30, 1},
-  };
-  matrix4x4_t transform2 = m4x4create(entries2);
+  matrix4x4_t rotation = createRotationMatrix(alpha, phi, 0);
 
-  double entries3[4][4] = {
-      {cos(phi), 0, sin(phi), 0},
-      {0, 1, 0, 0},
-      {-sin(phi), 0, cos(phi), 0},
-      {0, 0, 0, 0},
-  };
-  matrix4x4_t transform3 = m4x4create(entries3);
+  matrix4x4_t transform5 = createProjectionMatrix(
+      1, 100, (double)SCREEN_HEIGHT / (double)(SCREEN_WIDTH), theta);
 
-  double entries4[4][4] = {
-      {1, 0, 0, 0},
-      {0, cos(alpha), sin(alpha), 0},
-      {0, -sin(alpha), cos(alpha), 0},
-      {0, 0, 0, 1},
-  };
-  matrix4x4_t transform4 = m4x4create(entries4);
+  matrix4x4_t transform = m4x4mul(3, transform2, rotation, transform5);
 
-  double far = 100;
-  double near = 1;
-  double a = (double)SCREEN_HEIGHT / (double)SCREEN_WIDTH;
-  double entries5[4][4] = {
-      {a / tan(theta / 2), 0, 0, 0},
-      {0, 1 / tan(theta / 2), 0, 0},
-      {0, 0, (far) / (far - near), 1},
-      {0, 0, (far * near) / (far - near), 0},
-  };
-  matrix4x4_t transform5 = m4x4create(entries5);
-
-  vector3_t Y = {0, 1, 0};
-  vector3_t target = {0, 0, -1};
-  // target = v3m4x4mul(target, transform3);
-  //
-  vector3_t eye = camera;
-
-  vector3_t forward = SUB(target, eye);
+  // forward vector for velocity calculation
+  forward = (vector3_t){0, 0, 1};
+  matrix4x4_t yrot = createRotationMatrix(0, -phi, 0);
+  forward = v3m4x4mul(forward, yrot);
   forward = NORM(forward);
 
-  vector3_t side = CROSS(forward, Y);
-  side = NORM(side);
-
-  vector3_t up = CROSS(side, forward);
-  up = NORM(up);
-
-  double entries6[4][4] = {
-      {side.x, side.y, side.z, -DOT(side, eye)},
-      {up.x, up.y, up.z, -DOT(up, eye)},
-      {-forward.x, -forward.y, -forward.z, -DOT(forward, eye)},
-      {0, 0, 0, 1},
-  };
-  matrix4x4_t transform6 = m4x4create(entries6);
-
-  matrix4x4_t transform = m4x4mul(3, transform2, transform6, transform5 );
+  // get right vector
+  right = CROSS(forward, up);
+  right = NORM(right);
 
   vector4_t draworder[mesh.tlen][3];
   int drawcount = 0;
@@ -447,7 +395,6 @@ void v3meshdraw(v3mesh_t mesh) {
     vector4_t p1 = draworder[i][1];
     vector4_t p2 = draworder[i][2];
 
-    v4print(p0);
     vector3_t line1 = SUB(p1, p0);
     vector3_t line2 = SUB(p2, p0);
     vector3_t norm = CROSS(line1, line2);
@@ -482,21 +429,19 @@ void handleMouse() {
   SDL_GetMouseState(&mouseX, &mouseY);
   int offsetX = mouseX - SCREEN_WIDTH / 2;
   int offsetY = mouseY - SCREEN_HEIGHT / 2;
-  /*
   SDL_WarpMouseInWindow(window, SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2);
   // theta = fmod(theta + offsetX * sensitivity / 100, (double)2 * PI);
   if (offsetX > 2)
     offsetX = 2;
   if (offsetX < -2)
     offsetX = -2;
-  phi += ((double)offsetX / 100)*sensitivity;
+  phi += ((double)offsetX / 100) * sensitivity;
 
   if (offsetY > 2)
     offsetY = 2;
   if (offsetY < -2)
     offsetY = -2;
-  alpha -= ((double)offsetY / 100)*sensitivity;
-  */
+  alpha += ((double)offsetY / 100) * sensitivity;
 
   //  if ((fabs(phi + offsetY * sensitivity / 100) <= 2 * PI))
   //    phi = phi + offsetY * sensitivity / 100;
@@ -545,7 +490,6 @@ void normv2line(vector2_t u, vector2_t v, int color) {
 }
 
 void normv2triangle(vector2_t u, vector2_t v, vector2_t w, int color) {
-  v2print(u);
   u = v2NormalizedToScreen(u);
   v = v2NormalizedToScreen(v);
   w = v2NormalizedToScreen(w);
