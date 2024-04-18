@@ -12,7 +12,7 @@
 #define MIN(x, y) x > y ? y : x
 #define MAX(x, y) x < y ? y : x
 
-// #define DEBUG
+#define DEBUG
 
 typedef struct v3mesh_t {
   vector3_t *vertices;
@@ -74,7 +74,7 @@ int main() {
   int quit = 0;
   SDL_Event e;
 
-  v3mesh_t mesh = loadobjfile("teapot.obj");
+  v3mesh_t mesh = loadobjfile("mountains.obj");
   mesh.color = 0xFFFFFF;
 
   unsigned int starttime = SDL_GetTicks();
@@ -87,36 +87,37 @@ int main() {
     }
     unsigned int currenttime = SDL_GetTicks();
     double elapsedtime = (double)(currenttime - starttime) / 1000;
+    double speed = 0.7;
     vector3_t velocity = {0, 0, 0};
     if (keystates[SDL_SCANCODE_UP]) {
-      velocity.y += 0.1;
+      velocity.y += speed;
     }
     if (keystates[SDL_SCANCODE_DOWN]) {
-      velocity.y -= 0.1;
+      velocity.y -= speed;
     }
     if (keystates[SDL_SCANCODE_A]) {
-      vector3_t velocityscaled = MUL(right, 0.1);
+      vector3_t velocityscaled = MUL(right, speed);
       velocity = ADD(velocity, velocityscaled);
     }
     if (keystates[SDL_SCANCODE_D]) {
-      vector3_t velocityscaled = MUL(right, -0.1);
+      vector3_t velocityscaled = MUL(right, -speed);
       velocity = ADD(velocity, velocityscaled);
     }
     if (keystates[SDL_SCANCODE_W]) {
-      vector3_t velocityscaled = MUL(forward, 0.1);
+      vector3_t velocityscaled = MUL(forward, speed);
       velocity = ADD(velocity, velocityscaled);
     }
     if (keystates[SDL_SCANCODE_S]) {
-      vector3_t velocityscaled = MUL(forward, -0.1);
+      vector3_t velocityscaled = MUL(forward, -speed);
       velocity = ADD(velocity, velocityscaled);
     }
 
     camera = ADD(camera, velocity);
 
     if (keystates[SDL_SCANCODE_LEFT])
-      phi += -0.01;
+      phi += -0.03;
     if (keystates[SDL_SCANCODE_RIGHT])
-      phi -= -0.01;
+      phi += 0.03;
 
     handleMouse();
 
@@ -338,10 +339,16 @@ int v4cmpz(const void *u, const void *v) {
   return 0;
 }
 
+int cliptriangle(vector3_t planepoint, vector3_t planenormal, vector3_t in[3],
+                 vector3_t out1[3], vector3_t out2[3]) {
+  planenormal = NORM(planenormal);
+  return 0;  
+}
+
 void v3meshdraw(v3mesh_t mesh) {
 
   matrix4x4_t transform2 =
-      createTranslationMatrix(-camera.x, -camera.y, -camera.z + 30);
+      createTranslationMatrix(-camera.x, -camera.y, -camera.z);
 
   matrix4x4_t rotation = createRotationMatrix(alpha, phi, 0);
 
@@ -399,8 +406,8 @@ void v3meshdraw(v3mesh_t mesh) {
     norm = NORM(norm);
 
     vector3_t light = {0, 0, -1};
-    light = NORM(light);
-    double luminence = DOT(light, norm);
+    vector3_t lightnorm = NORM(light);
+    double luminence = DOT(lightnorm, norm) * 1/LEN(light);
 
     double hue, saturation, value;
     hextohsv(mesh.color, &hue, &saturation, &value);
@@ -408,39 +415,13 @@ void v3meshdraw(v3mesh_t mesh) {
     value *= MAX(luminence, 0.4);
 
     int color = hsvtohex(hue, saturation, value);
-    normv2triangle(v4tov2(p0), v4tov2(p1), v4tov2(p2), color);
+    if (
+    -p0.w <= p0.x && p0.x <= p0.w && -p0.w <= p0.y && p0.y <= p0.w &&
+    -p1.w <= p1.x && p1.x <= p1.w && -p1.w <= p1.y && p1.y <= p1.w &&
+    -p2.w <= p2.x && p2.x <= p2.w && -p2.w <= p2.y && p2.y <= p2.w
+    )
+      normv2triangle(v4tov2(p0), v4tov2(p1), v4tov2(p2), color);
   }
-
-  /*
-   * NEED TO MAKE SURE THIS CODE WORKS PROPERLY BEFORE CLIPPING
-   *
-   *
-  v4queue_t *q = v4qcreate(3);
-  vector4_t p0 = {1, 2, 3, 4};
-  if (v4enq(q, p0))
-    printf("QUEUE IS FULL 0\n");
-  if (v4enq(q, p0))
-    printf("QUEUE IS FULL 1\n");
-
-  if (v4deq(q, &p0))
-    printf("QUEUE IS EMPTY 0\n");
-  if (v4deq(q, &p0))
-    printf("QUEUE IS EMPTY 1\n");
-  if (v4enq(q, p0))
-    printf("QUEUE IS FULL 0\n");
-  if (v4deq(q, &p0))
-    printf("QUEUE IS EMPTY 2\n");
-  if (v4deq(q, &p0))
-    printf("QUEUE IS EMPTY 3\n");
-
-  for (int i = q->tail ; i != q->head; i = (i + 1) % q->capacity)
-    v4print(q->list[i]);
-
-  v4qfree(q);
-  */
-
-
-
 }
 
 void v3meshfree(v3mesh_t mesh) {
@@ -458,8 +439,9 @@ void handleMouse() {
   SDL_GetMouseState(&mouseX, &mouseY);
   int offsetX = mouseX - SCREEN_WIDTH / 2;
   int offsetY = mouseY - SCREEN_HEIGHT / 2;
-  SDL_WarpMouseInWindow(window, SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2);
+  //SDL_WarpMouseInWindow(window, SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2);
   // theta = fmod(theta + offsetX * sensitivity / 100, (double)2 * PI);
+  /*
   if (offsetX > 2)
     offsetX = 2;
   if (offsetX < -2)
@@ -472,6 +454,7 @@ void handleMouse() {
     offsetY = -2;
   alpha += ((double)offsetY / 100) * sensitivity;
 
+  */
   //  if ((fabs(phi + offsetY * sensitivity / 100) <= 2 * PI))
   //    phi = phi + offsetY * sensitivity / 100;
 }
