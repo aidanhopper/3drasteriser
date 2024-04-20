@@ -230,3 +230,169 @@ static inline matrix4x4_t createProjectionMatrix(double near, double far,
   };
   return m4x4create(entries5);
 }
+
+static inline double _det2(double A[2][2]) {
+  return A[0][0] * A[1][1] - A[0][1] * A[1][0];
+}
+
+static inline double _det3(double A[3][3]) {
+  double m[2][2];
+  double sum = 0;
+
+  // a00 column
+  m[0][0] = A[1][1];
+  m[1][0] = A[2][1];
+  m[0][1] = A[1][2];
+  m[1][1] = A[2][2];
+  sum += A[0][0] * _det2(m);
+
+  // a01 column
+  m[0][0] = A[1][0];
+  m[1][0] = A[2][0];
+  m[0][1] = A[1][2];
+  m[1][1] = A[2][2];
+  sum -= A[0][1] * _det2(m);
+
+  // a02 column
+  m[0][0] = A[1][0];
+  m[1][0] = A[2][0];
+  m[0][1] = A[1][1];
+  m[1][1] = A[2][1];
+  sum += A[0][2] * _det2(m);
+
+  return sum;
+}
+
+static inline double _det4(double A[4][4]) {
+  double m[3][3];
+  double sum = 0;
+
+  // a00 column
+  m[0][0] = A[1][1];
+  m[1][0] = A[2][1];
+  m[2][0] = A[3][1];
+  m[0][1] = A[1][2];
+  m[1][1] = A[2][2];
+  m[2][1] = A[3][2];
+  m[0][2] = A[1][3];
+  m[1][2] = A[2][3];
+  m[2][2] = A[3][3];
+  sum += A[0][0] * _det3(m);
+
+  // a01 column
+  m[0][0] = A[1][0];
+  m[1][0] = A[2][0];
+  m[2][0] = A[3][0];
+  m[0][1] = A[1][2];
+  m[1][1] = A[2][2];
+  m[2][1] = A[3][2];
+  m[0][2] = A[1][3];
+  m[1][2] = A[2][3];
+  m[2][2] = A[3][3];
+  sum -= A[0][1] * _det3(m);
+
+  // a02 column
+  m[0][0] = A[1][0];
+  m[1][0] = A[2][0];
+  m[2][0] = A[3][0];
+  m[0][1] = A[1][1];
+  m[1][1] = A[2][1];
+  m[2][1] = A[3][1];
+  m[0][2] = A[1][3];
+  m[1][2] = A[2][3];
+  m[2][2] = A[3][3];
+  sum += A[0][2] * _det3(m);
+
+  // a03 column
+  m[0][0] = A[1][0];
+  m[1][0] = A[2][0];
+  m[2][0] = A[3][0];
+  m[0][1] = A[1][1];
+  m[1][1] = A[2][1];
+  m[2][1] = A[3][1];
+  m[0][2] = A[1][2];
+  m[1][2] = A[2][2];
+  m[2][2] = A[3][2];
+  sum -= A[0][3] * _det3(m);
+
+  return sum;
+}
+
+static inline double m4x4det(matrix4x4_t A) { return _det4(A.entries); }
+
+static inline matrix4x4_t m4x4cofactor(matrix4x4_t A) {
+  double cofactor[4][4];
+  double m[3][3];
+
+  int factor_r = 1;
+  int factor_c = 1;
+  int m_r = 0;
+  int m_c = 0;
+  int alt = 1;
+
+  for (int factor_r = 0; factor_r < 4; factor_r++) {
+    for (int factor_c = 0; factor_c < 4; factor_c++) {
+      for (int r = 0; r < 4; r++) {
+        for (int c = 0; c < 4; c++) {
+          if (r == factor_r) {
+            m_r--;
+            break;
+          } else if (c != factor_c) {
+            m[m_r][m_c++] = A.entries[r][c];
+          }
+        }
+
+        /*
+        for (int i = 0; i < 3; i++) {
+          for (int j = 0; j < 3; j++)
+            printf("%lf ", m[i][j]);
+          printf("\n");
+        }
+        printf("\n");
+        printf("\n");
+       */
+        m_r++;
+        m_c = 0;
+      }
+      m_r = 0;
+      cofactor[factor_r][factor_c] = _det3(m) * alt;
+      alt *= -1;
+    }
+    alt *= -1;
+  }
+  return m4x4create(cofactor);
+}
+
+static inline matrix4x4_t m4x4transpose(matrix4x4_t A) {
+  double copy[4][4] = {
+    {A.entries[0][0], A.entries[0][1], A.entries[0][2], A.entries[0][3]},
+    {A.entries[1][0], A.entries[1][1], A.entries[1][2], A.entries[1][3]},
+    {A.entries[2][0], A.entries[2][1], A.entries[2][2], A.entries[2][3]},
+    {A.entries[3][0], A.entries[3][1], A.entries[3][2], A.entries[3][3]},
+  };
+  for (int i = 0; i < 4; i++)
+    for (int j = 0; j < 4; j++)
+      A.entries[i][j] = copy[j][i];
+
+  return A;
+}
+
+static inline matrix4x4_t m4x4adjoint(matrix4x4_t A) {
+  A = m4x4cofactor(A);
+  A = m4x4transpose(A);
+  return A;
+}
+
+static inline matrix4x4_t m4x4scale(matrix4x4_t A, double s) {
+  for (int i = 0; i < 4; i++)
+    for (int j = 0; j < 4; j++)
+      A.entries[i][j] *= s;
+  return A;
+}
+
+static inline matrix4x4_t m4x4invert(matrix4x4_t A) {
+  double det = m4x4det(A);
+  matrix4x4_t adjoint = m4x4adjoint(A);
+  adjoint = m4x4scale(adjoint, 1/det);
+  return adjoint;
+}

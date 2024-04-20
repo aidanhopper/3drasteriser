@@ -80,6 +80,7 @@ int main() {
   mesh.color = 0xFFFFFF;
 
   unsigned int starttime = SDL_GetTicks();
+
   while (!quit) {
 
     const unsigned char *keystates = SDL_GetKeyboardState(NULL);
@@ -125,10 +126,6 @@ int main() {
 
     clear(0x0);
 
-    vector2_t p0 = {-0.019036, -0.020741};
-    vector2_t p1 = {1, -1};
-    vector2_t p2 = {1, 1};
-    // normv2triangle(p0, p1, p2, 0xFF0000);
     v3meshdraw(mesh);
 
     present();
@@ -466,6 +463,7 @@ void v3meshdraw(v3mesh_t mesh) {
       normv2triangle(v4tov2(tribuf[i][0]), v4tov2(tribuf[i][1]),
                      v4tov2(tribuf[i][2]), color);
   }
+
 }
 
 void v3meshfree(v3mesh_t mesh) {
