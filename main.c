@@ -12,7 +12,7 @@
 #define MIN(x, y) x > y ? y : x
 #define MAX(x, y) x < y ? y : x
 
-// #define DEBUG
+#define DEBUG
 
 typedef struct v3mesh_t {
   vector3_t *vertices;
@@ -76,7 +76,7 @@ int main() {
   int quit = 0;
   SDL_Event e;
 
-  v3mesh_t mesh = loadobjfile("mountains.obj");
+  v3mesh_t mesh = loadobjfile("axis.obj");
   mesh.color = 0xFFFFFF;
 
   unsigned int starttime = SDL_GetTicks();
@@ -339,54 +339,128 @@ int v4cmpz(const void *u, const void *v) {
 }
 
 double lerp(double x, vector2_t p0, vector2_t p1) {
-  double m =
-      ((p1.y - p0.y) / (p1.x - p0.x));
+  double m = ((p1.y - p0.y) / (p1.x - p0.x));
 
   return m * (x - p0.x) + p0.y;
 }
 
-int cliptriangle(vector4_t p0, vector4_t p1, vector4_t p2,
-                 vector4_t tribuf[3][3]) {
+vector3_t getLeftPlaneNorm(vector4_t p) {
+  vector3_t leftp = {-p.w, 0, p.z};
+  leftp = NORM(leftp);
+  leftp = CROSS(leftp, up);
+  return NORM(leftp);
+}
 
-  int len = 0;
-  tribuf[0][0] = p0;
-  tribuf[0][1] = p1;
-  tribuf[0][2] = p2;
+vector3_t getRightPlaneNorm(vector4_t p) {
+  vector3_t rightp = {p.w, 0, p.z};
+  rightp = NORM(rightp);
+  rightp = CROSS(up, rightp);
+  return NORM(rightp);
+}
 
-  vector2_t in[5];
-  int inlen = 0;
+vector3_t getTopPlaneNorm(vector4_t p) {
+  vector3_t topp = {0, p.w, p.z};
+  topp = NORM(topp);
+  topp = CROSS(topp, right);
+  return NORM(topp);
+}
 
-  vector2_t out[5];
-  int outlen = 0;
+vector3_t getBottomPlaneNorm(vector4_t p) {
+  vector3_t bottomp = {0, -p.w, p.z};
+  bottomp = NORM(bottomp);
+  bottomp = CROSS(right, bottomp);
+  return NORM(bottomp);
+}
 
-  vector2_t p0projected = {p0.x / p0.w, p0.y / p0.w};
-  vector2_t p1projected = {p1.x / p1.w, p1.y / p1.w};
-  vector2_t p2projected = {p2.x / p2.w, p2.y / p2.w};
+vector3_t getNearPlaneNorm(double near) {
+  vector3_t nearp = {0, 0, -near};
+  return NORM(nearp);
+}
 
-  // for each plane (x=-1, x=1, y=-1, y=1)
-  //   clip
-
-  if (p0projected.x < -1) {
-    p0projected.y = lerp(-1, p0projected, p1projected);
-    in[inlen++] = p0projected;
-  }
-  else {
-    in[inlen++] = p0projected;
-  }
-
-
-
-
-  if (-p0.w <= p0.x && p0.x <= p0.w && -p0.w <= p0.y && p0.y <= p0.w &&
-      -p1.w <= p1.x && p1.x <= p1.w && -p1.w <= p1.y && p1.y <= p1.w &&
-      -p2.w <= p2.x && p2.x <= p2.w && -p2.w <= p2.y && p2.y <= p2.w)
-    return 1;
-
-  return 0;
+vector3_t getFarPlaneNorm(double far) {
+  vector3_t farp= {0, 0, far};
+  return NORM(farp);
 }
 
 void v3meshdraw(v3mesh_t mesh) {
 
+  // I need figure out the exact operations I should be performing
+  // because my ordering might be wrong
+  matrix4x4_t rot1 = createRotationMatrix(phi, 0, 0);
+  // matrix4x4_t rot2 = createRotationMatrix(0, phi/2, 0);
+  matrix4x4_t translation = createTranslationMatrix(0, -5, -30);
+  matrix4x4_t view = createViewMatrix();
+  matrix4x4_t projection = createProjectionMatrix(1, 100, aspectratio, theta);
+  matrix4x4_t transform = m4x4mul(3, translation, rot1, projection);
+
+  vector4_t draworder[mesh.tlen][3];
+  int drawcount = 0;
+
+  for (int i = 0; i < mesh.tlen; i++) {
+    vector4_t p0 = v3tov4(mesh.vertices[mesh.triangles[i][0]]);
+    vector4_t p1 = v3tov4(mesh.vertices[mesh.triangles[i][1]]);
+    vector4_t p2 = v3tov4(mesh.vertices[mesh.triangles[i][2]]);
+
+    vector4_t p0projected = v4m4x4mul(p0, transform);
+    vector4_t p1projected = v4m4x4mul(p1, transform);
+    vector4_t p2projected = v4m4x4mul(p2, transform);
+
+    vector3_t p = {0, 0, 0};
+
+    vector3_t leftPlaneNorm = getLeftPlaneNorm(p0projected);
+    vector3_t rightPlaneNorm = getRightPlaneNorm(p0projected);
+    vector3_t topPlaneNorm = getTopPlaneNorm(p0projected);
+    vector3_t bottomPlaneNorm = getBottomPlaneNorm(p0projected);
+
+
+    if (DOT(leftPlaneNorm, p0projected) < 0) {
+      v4print(p0projected);
+    }
+
+    if (DOT(rightPlaneNorm, p0projected) < 0) {
+      v4print(p0projected);
+    }
+
+    if (DOT(topPlaneNorm, p0projected) < 0) {
+      v4print(p0projected);
+    }
+
+    if (DOT(bottomPlaneNorm, p0projected) < 0) {
+      v4print(p0projected);
+    }
+
+
+
+    // does crude clipping
+    if (-p0projected.w < p0projected.x && p0projected.x < p0projected.w &&
+        -p0projected.w < p0projected.y && p0projected.y < p0projected.w &&
+        -p1projected.w < p1projected.x && p1projected.x < p1projected.w &&
+        -p1projected.w < p1projected.y && p1projected.y < p1projected.w &&
+        -p2projected.w < p2projected.x && p2projected.x < p2projected.w &&
+        -p2projected.w < p2projected.y && p2projected.y < p2projected.w) {
+      draworder[drawcount][0] = p0projected;
+      draworder[drawcount][1] = p1projected;
+      draworder[drawcount][2] = p2projected;
+      drawcount++;
+    }
+  }
+
+  printf("\n");
+
+  // uses painters algorithm for drawing
+  qsort(draworder, drawcount, sizeof(vector4_t) * 3, v4cmpz);
+  for (int i = 0; i < drawcount; i++) {
+    vector4_t p0 = draworder[i][0];
+    vector4_t p1 = draworder[i][1];
+    vector4_t p2 = draworder[i][2];
+
+    vector2_t p0image = v4tov2(p0);
+    vector2_t p1image = v4tov2(p1);
+    vector2_t p2image = v4tov2(p2);
+    normv2triangle(p0image, p1image, p2image, 0x0);
+  }
+
+  /*
   matrix4x4_t transform2 =
       createTranslationMatrix(-camera.x, -camera.y, -camera.z + 10);
 
@@ -463,7 +537,9 @@ void v3meshdraw(v3mesh_t mesh) {
       normv2triangle(v4tov2(tribuf[i][0]), v4tov2(tribuf[i][1]),
                      v4tov2(tribuf[i][2]), color);
   }
+  */
 
+  // qsort(draworder, drawcount, sizeof(vector4_t) * 3, v4cmpz);
 }
 
 void v3meshfree(v3mesh_t mesh) {

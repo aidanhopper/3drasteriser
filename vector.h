@@ -83,7 +83,7 @@ static inline vector4_t v4m4x4mul(vector4_t v, matrix4x4_t A) {
   return ret;
 }
 
-static inline vector4_t m4x4v4mul(matrix4x4_t A, vector4_t v) {
+static inline vector4_t m4x4v4mul(vector4_t v, matrix4x4_t A) {
   vector4_t ret;
   ret.x = v.x * A.entries[0][0] + v.y * A.entries[0][1] +
           v.z * A.entries[0][2] + v.w * A.entries[0][3];
@@ -185,7 +185,7 @@ static inline matrix4x4_t createRotationMatrix(double x, double y, double z) {
       {cos(y), 0, sin(y), 0},
       {0, 1, 0, 0},
       {-sin(y), 0, cos(y), 0},
-      {0, 0, 0, 0},
+      {0, 0, 0, 1},
   };
   matrix4x4_t yrot = m4x4create(yrotation);
 
@@ -225,10 +225,14 @@ static inline matrix4x4_t createProjectionMatrix(double near, double far,
   double entries5[4][4] = {
       {a / tan(fov / 2), 0, 0, 0},
       {0, 1 / tan(fov / 2), 0, 0},
-      {0, 0, (far) / (far - near), 1},
-      {0, 0, (far * near) / (far - near), 0},
+      {0, 0, (far + near) / (far - near), -1},
+      {0, 0, (2 * far * near) / (far - near), 0},
   };
   return m4x4create(entries5);
+}
+
+static inline matrix4x4_t createViewMatrix() {
+
 }
 
 static inline double _det2(double A[2][2]) {
@@ -365,10 +369,10 @@ static inline matrix4x4_t m4x4cofactor(matrix4x4_t A) {
 
 static inline matrix4x4_t m4x4transpose(matrix4x4_t A) {
   double copy[4][4] = {
-    {A.entries[0][0], A.entries[0][1], A.entries[0][2], A.entries[0][3]},
-    {A.entries[1][0], A.entries[1][1], A.entries[1][2], A.entries[1][3]},
-    {A.entries[2][0], A.entries[2][1], A.entries[2][2], A.entries[2][3]},
-    {A.entries[3][0], A.entries[3][1], A.entries[3][2], A.entries[3][3]},
+      {A.entries[0][0], A.entries[0][1], A.entries[0][2], A.entries[0][3]},
+      {A.entries[1][0], A.entries[1][1], A.entries[1][2], A.entries[1][3]},
+      {A.entries[2][0], A.entries[2][1], A.entries[2][2], A.entries[2][3]},
+      {A.entries[3][0], A.entries[3][1], A.entries[3][2], A.entries[3][3]},
   };
   for (int i = 0; i < 4; i++)
     for (int j = 0; j < 4; j++)
@@ -393,6 +397,6 @@ static inline matrix4x4_t m4x4scale(matrix4x4_t A, double s) {
 static inline matrix4x4_t m4x4invert(matrix4x4_t A) {
   double det = m4x4det(A);
   matrix4x4_t adjoint = m4x4adjoint(A);
-  adjoint = m4x4scale(adjoint, 1/det);
+  adjoint = m4x4scale(adjoint, 1 / det);
   return adjoint;
 }
