@@ -12,7 +12,7 @@
 #define MIN(x, y) x > y ? y : x
 #define MAX(x, y) x < y ? y : x
 
-#define DEBUG
+// #define DEBUG
 
 typedef struct v3mesh_t {
   vector3_t *vertices;
@@ -34,6 +34,8 @@ vector3_t camera = {0, 0, 0};
 vector3_t forward = {0, 0, -1};
 vector3_t up = {0, 1, 0};
 vector3_t right = {1, 0, 0};
+
+double aspectratio = (double)SCREEN_HEIGHT / (double)(SCREEN_WIDTH);
 
 int init();
 int cleanup();
@@ -115,9 +117,9 @@ int main() {
     camera = ADD(camera, velocity);
 
     if (keystates[SDL_SCANCODE_LEFT])
-      phi += -0.03;
+      phi += -0.01;
     if (keystates[SDL_SCANCODE_RIGHT])
-      phi += 0.03;
+      phi += 0.01;
 
     handleMouse();
 
@@ -339,16 +341,57 @@ int v4cmpz(const void *u, const void *v) {
   return 0;
 }
 
-int cliptriangle(vector3_t planepoint, vector3_t planenormal, vector3_t in[3],
-                 vector3_t out1[3], vector3_t out2[3]) {
-  planenormal = NORM(planenormal);
-  return 0;  
+double lerp(double x, vector2_t p0, vector2_t p1) {
+  double m =
+      ((p1.y - p0.y) / (p1.x - p0.x));
+
+  return m * (x - p0.x) + p0.y;
+}
+
+int cliptriangle(vector4_t p0, vector4_t p1, vector4_t p2,
+                 vector4_t tribuf[3][3]) {
+
+  int len = 0;
+  tribuf[0][0] = p0;
+  tribuf[0][1] = p1;
+  tribuf[0][2] = p2;
+
+  vector2_t in[5];
+  int inlen = 0;
+
+  vector2_t out[5];
+  int outlen = 0;
+
+  vector2_t p0projected = {p0.x / p0.w, p0.y / p0.w};
+  vector2_t p1projected = {p1.x / p1.w, p1.y / p1.w};
+  vector2_t p2projected = {p2.x / p2.w, p2.y / p2.w};
+
+  // for each plane (x=-1, x=1, y=-1, y=1)
+  //   clip
+
+  if (p0projected.x < -1) {
+    p0projected.y = lerp(-1, p0projected, p1projected);
+    in[inlen++] = p0projected;
+  }
+  else {
+    in[inlen++] = p0projected;
+  }
+
+
+
+
+  if (-p0.w <= p0.x && p0.x <= p0.w && -p0.w <= p0.y && p0.y <= p0.w &&
+      -p1.w <= p1.x && p1.x <= p1.w && -p1.w <= p1.y && p1.y <= p1.w &&
+      -p2.w <= p2.x && p2.x <= p2.w && -p2.w <= p2.y && p2.y <= p2.w)
+    return 1;
+
+  return 0;
 }
 
 void v3meshdraw(v3mesh_t mesh) {
 
   matrix4x4_t transform2 =
-      createTranslationMatrix(-camera.x, -camera.y, -camera.z);
+      createTranslationMatrix(-camera.x, -camera.y, -camera.z + 10);
 
   matrix4x4_t rotation = createRotationMatrix(alpha, phi, 0);
 
@@ -407,7 +450,7 @@ void v3meshdraw(v3mesh_t mesh) {
 
     vector3_t light = {0, 0, -1};
     vector3_t lightnorm = NORM(light);
-    double luminence = DOT(lightnorm, norm) * 1/LEN(light);
+    double luminence = DOT(lightnorm, norm) * 1 / LEN(light);
 
     double hue, saturation, value;
     hextohsv(mesh.color, &hue, &saturation, &value);
@@ -415,12 +458,13 @@ void v3meshdraw(v3mesh_t mesh) {
     value *= MAX(luminence, 0.4);
 
     int color = hsvtohex(hue, saturation, value);
-    if (
-    -p0.w <= p0.x && p0.x <= p0.w && -p0.w <= p0.y && p0.y <= p0.w &&
-    -p1.w <= p1.x && p1.x <= p1.w && -p1.w <= p1.y && p1.y <= p1.w &&
-    -p2.w <= p2.x && p2.x <= p2.w && -p2.w <= p2.y && p2.y <= p2.w
-    )
-      normv2triangle(v4tov2(p0), v4tov2(p1), v4tov2(p2), color);
+
+    vector4_t tribuf[3][3];
+    int len = cliptriangle(p0, p1, p2, tribuf);
+
+    for (int i = 0; i < len; i++)
+      normv2triangle(v4tov2(tribuf[i][0]), v4tov2(tribuf[i][1]),
+                     v4tov2(tribuf[i][2]), color);
   }
 }
 
@@ -439,8 +483,8 @@ void handleMouse() {
   SDL_GetMouseState(&mouseX, &mouseY);
   int offsetX = mouseX - SCREEN_WIDTH / 2;
   int offsetY = mouseY - SCREEN_HEIGHT / 2;
-  //SDL_WarpMouseInWindow(window, SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2);
-  // theta = fmod(theta + offsetX * sensitivity / 100, (double)2 * PI);
+  // SDL_WarpMouseInWindow(window, SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2);
+  //  theta = fmod(theta + offsetX * sensitivity / 100, (double)2 * PI);
   /*
   if (offsetX > 2)
     offsetX = 2;
