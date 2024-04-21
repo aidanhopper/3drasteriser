@@ -27,25 +27,19 @@ typedef struct matrix4x4_t {
 
 #define DOT(v, u) (v.x * u.x + v.y * u.y + v.z * u.z)
 #define CROSS(v, u)                                                            \
-  (vector3_t) {                                                                \
-    (v.y * u.z - v.z * u.y), -(v.x * u.z - v.z * u.x), (v.x * u.y - v.y * u.x) \
-  }
+  ((vector3_t){(v.y * u.z - v.z * u.y), -(v.x * u.z - v.z * u.x),              \
+               (v.x * u.y - v.y * u.x)})
 #define NORM(u)                                                                \
-  (vector3_t) {                                                                \
-    u.x / (sqrtf(u.x * u.x + u.y * u.y + u.z * u.z)),                          \
-        u.y / (sqrtf(u.x * u.x + u.y * u.y + u.z * u.z)),                      \
-        u.z / (sqrtf(u.x * u.x + u.y * u.y + u.z * u.z))                       \
-  }
+  ((vector3_t){u.x / (sqrtf(u.x * u.x + u.y * u.y + u.z * u.z)),               \
+               u.y / (sqrtf(u.x * u.x + u.y * u.y + u.z * u.z)),               \
+               u.z / (sqrtf(u.x * u.x + u.y * u.y + u.z * u.z))})
 
-#define ADD(v, u)                                                              \
-  (vector3_t) { v.x + u.x, v.y + u.y, v.z + u.z }
+#define ADD(v, u) ((vector3_t){v.x + u.x, v.y + u.y, v.z + u.z})
 
-#define SUB(v, u)                                                              \
-  (vector3_t) { v.x - u.x, v.y - u.y, v.z - u.z }
+#define SUB(v, u) ((vector3_t){v.x - u.x, v.y - u.y, v.z - u.z})
 
 #define LEN(u) (sqrtf(u.x * u.x + u.y * u.y + u.z * u.z))
-#define MUL(u, s)                                                              \
-  (vector3_t) { u.x *s, u.y *s, u.z *s }
+#define MUL(u, s) ((vector3_t){u.x * s, u.y * s, u.z * s})
 
 static inline void m4x4print(matrix4x4_t A);
 static inline vector3_t v3m4x4mul(vector3_t v, matrix4x4_t A);
@@ -231,9 +225,7 @@ static inline matrix4x4_t createProjectionMatrix(double near, double far,
   return m4x4create(entries5);
 }
 
-static inline matrix4x4_t createViewMatrix() {
-
-}
+static inline matrix4x4_t createViewMatrix() {}
 
 static inline double _det2(double A[2][2]) {
   return A[0][0] * A[1][1] - A[0][1] * A[1][0];

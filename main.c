@@ -27,7 +27,7 @@ SDL_Renderer *renderer = NULL;
 SDL_Texture *texture = NULL;
 SDL_Surface *surface = NULL;
 double theta = PI / 3;
-double phi = 0;
+double phi = -PI / 5;
 double alpha = 0;
 double sensitivity = 1;
 vector3_t camera = {0, 0, 0};
@@ -76,7 +76,7 @@ int main() {
   int quit = 0;
   SDL_Event e;
 
-  v3mesh_t mesh = loadobjfile("axis.obj");
+  v3mesh_t mesh = loadobjfile("mountains.obj");
   mesh.color = 0xFFFFFF;
 
   unsigned int starttime = SDL_GetTicks();
@@ -96,14 +96,14 @@ int main() {
       velocity.y += speed;
     }
     if (keystates[SDL_SCANCODE_DOWN]) {
-      velocity.y -= speed;
+      velocity.y += -speed;
     }
     if (keystates[SDL_SCANCODE_A]) {
-      vector3_t velocityscaled = MUL(right, speed);
+      vector3_t velocityscaled = MUL(right, -speed);
       velocity = ADD(velocity, velocityscaled);
     }
     if (keystates[SDL_SCANCODE_D]) {
-      vector3_t velocityscaled = MUL(right, -speed);
+      vector3_t velocityscaled = MUL(right, speed);
       velocity = ADD(velocity, velocityscaled);
     }
     if (keystates[SDL_SCANCODE_W]) {
@@ -118,9 +118,9 @@ int main() {
     camera = ADD(camera, velocity);
 
     if (keystates[SDL_SCANCODE_LEFT])
-      phi += -0.01;
-    if (keystates[SDL_SCANCODE_RIGHT])
       phi += 0.01;
+    if (keystates[SDL_SCANCODE_RIGHT])
+      phi += -0.01;
 
     handleMouse();
 
@@ -332,16 +332,10 @@ int v4cmpz(const void *u, const void *v) {
   double z1mid = (z10 + z11 + z12) / 3;
 
   if (z0mid < z1mid)
-    return 1;
-  if (z0mid > z1mid)
     return -1;
+  if (z0mid > z1mid)
+    return 1;
   return 0;
-}
-
-double lerp(double x, vector2_t p0, vector2_t p1) {
-  double m = ((p1.y - p0.y) / (p1.x - p0.x));
-
-  return m * (x - p0.x) + p0.y;
 }
 
 vector3_t getLeftPlaneNorm(vector4_t p) {
@@ -378,19 +372,118 @@ vector3_t getNearPlaneNorm(double near) {
 }
 
 vector3_t getFarPlaneNorm(double far) {
-  vector3_t farp= {0, 0, far};
+  vector3_t farp = {0, 0, far};
   return NORM(farp);
+}
+
+vector3_t lerp(vector3_t normal, vector4_t q2, vector4_t q1) {
+  double d1 = DOT(normal, q1);
+  double d2 = DOT(normal, q2);
+  double t = d1 / (d1 - d2);
+  return ADD(q1, MUL(SUB(q2, q1), t));
+}
+
+int clip(vector4_t p0, vector4_t p1, vector4_t p2, vector4_t in[24],
+         vector4_t out[24]) {
+
+  vector4_t points[24];
+  points[0] = p0;
+  points[1] = p1;
+  points[2] = p2;
+  int pointslen = 3;
+
+  int inlen = 0;
+  int outlen = 0;
+
+  vector3_t leftPlaneNorm = getLeftPlaneNorm(p0);
+  vector3_t rightPlaneNorm = getRightPlaneNorm(p0);
+  vector3_t topPlaneNorm = getTopPlaneNorm(p0);
+  vector3_t bottomPlaneNorm = getBottomPlaneNorm(p0);
+
+  vector3_t planeNorms[4] = {leftPlaneNorm, rightPlaneNorm, topPlaneNorm,
+                             bottomPlaneNorm};
+
+  // for each plane
+  //   for each point point list
+  //     if in add to in list
+  //     if out add to out list
+  //   for each point in out list
+  //     get new point with lerp & add to in list
+  //   copy in list to point list
+  // draw triangles between all points
+
+  for (int i = 0; i < 4; i++) {
+    vector3_t planenorm = planeNorms[i];
+
+    // puts points in inlist or outlist based on if they cross the plane
+    for (int j = 0; j < pointslen; j++) {
+      vector4_t point = points[j];
+      if (DOT(point, planenorm) >= 0)
+        in[inlen++] = point;
+      else
+        out[outlen++] = point;
+    }
+
+    // lerp for every point in the outlist with every point in the in list
+    if (inlen == 0)
+      break;
+
+    pointslen = 0;
+
+    for (int j = 0; j < outlen; j++) {
+      for (int k = 0; k < inlen; k++) {
+        vector3_t v3newpoint = lerp(planenorm, in[k], out[j]);
+        double new_w = 1;
+        if (i == 0)
+          new_w = -v3newpoint.x;
+        if (i == 1)
+          new_w = v3newpoint.x;
+        if (i == 2)
+          new_w = v3newpoint.y;
+        if (i == 3)
+          new_w = -v3newpoint.y;
+        vector4_t newpoint = {v3newpoint.x, v3newpoint.y, v3newpoint.z, new_w};
+        // v4print(out[0]);
+        // v4print(newpoint);
+        // v2print(v4tov2(newpoint));
+        // normv2line(v4tov2(newpoint), v4tov2(p1), 0xFF);
+        points[pointslen++] = newpoint;
+      }
+    }
+
+    for (int j = 0; j < inlen; j++)
+      points[pointslen++] = in[j];
+    inlen = 0;
+    outlen = 0;
+  }
+
+  for (int i = 0; i < pointslen - 1; i++) {
+    normv2line(v4tov2(points[i]), v4tov2(points[i + 1]), 0xFF0000);
+    v4print(points[i]);
+  }
+  printf("\n");
+
+  return 0;
 }
 
 void v3meshdraw(v3mesh_t mesh) {
 
   // I need figure out the exact operations I should be performing
   // because my ordering might be wrong
-  matrix4x4_t rot1 = createRotationMatrix(phi, 0, 0);
+  matrix4x4_t rot1 = createRotationMatrix(0, phi, 0);
   // matrix4x4_t rot2 = createRotationMatrix(0, phi/2, 0);
-  matrix4x4_t translation = createTranslationMatrix(0, -5, -30);
+  matrix4x4_t translation =
+      createTranslationMatrix(-camera.x, -camera.y, -camera.z - 10);
   matrix4x4_t view = createViewMatrix();
   matrix4x4_t projection = createProjectionMatrix(1, 100, aspectratio, theta);
+
+  double lookAtEntries[4][4] = {
+      {},
+      {},
+      {},
+      {},
+  };
+
   matrix4x4_t transform = m4x4mul(3, translation, rot1, projection);
 
   vector4_t draworder[mesh.tlen][3];
@@ -407,29 +500,9 @@ void v3meshdraw(v3mesh_t mesh) {
 
     vector3_t p = {0, 0, 0};
 
-    vector3_t leftPlaneNorm = getLeftPlaneNorm(p0projected);
-    vector3_t rightPlaneNorm = getRightPlaneNorm(p0projected);
-    vector3_t topPlaneNorm = getTopPlaneNorm(p0projected);
-    vector3_t bottomPlaneNorm = getBottomPlaneNorm(p0projected);
-
-
-    if (DOT(leftPlaneNorm, p0projected) < 0) {
-      v4print(p0projected);
-    }
-
-    if (DOT(rightPlaneNorm, p0projected) < 0) {
-      v4print(p0projected);
-    }
-
-    if (DOT(topPlaneNorm, p0projected) < 0) {
-      v4print(p0projected);
-    }
-
-    if (DOT(bottomPlaneNorm, p0projected) < 0) {
-      v4print(p0projected);
-    }
-
-
+    vector4_t in[24];
+    vector4_t out[24];
+    clip(p0projected, p1projected, p2projected, in, out);
 
     // does crude clipping
     if (-p0projected.w < p0projected.x && p0projected.x < p0projected.w &&
@@ -438,10 +511,18 @@ void v3meshdraw(v3mesh_t mesh) {
         -p1projected.w < p1projected.y && p1projected.y < p1projected.w &&
         -p2projected.w < p2projected.x && p2projected.x < p2projected.w &&
         -p2projected.w < p2projected.y && p2projected.y < p2projected.w) {
-      draworder[drawcount][0] = p0projected;
-      draworder[drawcount][1] = p1projected;
-      draworder[drawcount][2] = p2projected;
-      drawcount++;
+
+      vector3_t line1 = SUB(p1projected, p0projected);
+      vector3_t line2 = SUB(p2projected, p0projected);
+      vector3_t norm = CROSS(line1, line2);
+      norm = NORM(norm);
+
+      if (DOT(norm, p0projected) < 0) {
+        draworder[drawcount][0] = p0projected;
+        draworder[drawcount][1] = p1projected;
+        draworder[drawcount][2] = p2projected;
+        drawcount++;
+      }
     }
   }
 
@@ -454,10 +535,26 @@ void v3meshdraw(v3mesh_t mesh) {
     vector4_t p1 = draworder[i][1];
     vector4_t p2 = draworder[i][2];
 
+    vector3_t line1 = SUB(p1, p0);
+    vector3_t line2 = SUB(p2, p0);
+    vector3_t norm = CROSS(line1, line2);
+    norm = NORM(norm);
+
+    vector3_t light = {0, 0, 1};
+    vector3_t lightnorm = NORM(light);
+    double luminence = DOT(lightnorm, norm) / LEN(light);
+
+    double hue, saturation, value;
+    hextohsv(mesh.color, &hue, &saturation, &value);
+
+    value *= MAX(luminence, 0.4);
+
+    int color = hsvtohex(hue, saturation, value);
+
     vector2_t p0image = v4tov2(p0);
     vector2_t p1image = v4tov2(p1);
     vector2_t p2image = v4tov2(p2);
-    normv2triangle(p0image, p1image, p2image, 0x0);
+    normv2triangle(p0image, p1image, p2image, color);
   }
 
   /*
