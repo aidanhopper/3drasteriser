@@ -4,25 +4,25 @@
 #include <stdio.h>
 
 typedef struct vector4_t {
-  double x;
-  double y;
-  double z;
-  double w;
+  float x;
+  float y;
+  float z;
+  float w;
 } vector4_t;
 
 typedef struct vector3_t {
-  double x;
-  double y;
-  double z;
+  float x;
+  float y;
+  float z;
 } vector3_t;
 
 typedef struct vector2_t {
-  double x;
-  double y;
+  float x;
+  float y;
 } vector2_t;
 
 typedef struct matrix4x4_t {
-  double entries[4][4];
+  float entries[4][4];
 } matrix4x4_t;
 
 #define DOT(v, u) (v.x * u.x + v.y * u.y + v.z * u.z)
@@ -40,6 +40,11 @@ typedef struct matrix4x4_t {
 
 #define LEN(u) (sqrtf(u.x * u.x + u.y * u.y + u.z * u.z))
 #define MUL(u, s) ((vector3_t){u.x * s, u.y * s, u.z * s})
+#define SURFACENORM(p0, p1, p2) (NORM(CROSS(SUB(p1, p0), SUB(p2, p0))))
+//   vector3_t line1 = SUB(p1viewed, p0viewed);
+//   vector3_t line2 = SUB(p2viewed, p0viewed);
+//   vector3_t norm = CROSS(line1, line2);
+//   norm = NORM(norm);
 
 static inline void m4x4print(matrix4x4_t A);
 static inline vector3_t v3m4x4mul(vector3_t v, matrix4x4_t A);
@@ -53,7 +58,7 @@ static inline vector4_t v3tov4(vector3_t v) {
   return (vector4_t){v.x, v.y, v.z, 1};
 }
 
-static inline matrix4x4_t m4x4create(double m[4][4]) {
+static inline matrix4x4_t m4x4create(float m[4][4]) {
   matrix4x4_t ret;
   for (int i = 0; i < 4; i++) {
     for (int j = 0; j < 4; j++) {
@@ -120,10 +125,10 @@ static inline matrix4x4_t m4x4mul(int argcount, ...) {
   return ret;
 }
 
-static inline void v2print(vector2_t v) { printf("<%lf, %lf>\n", v.x, v.y); }
+static inline void v2print(vector2_t v) { printf("[%lf, %lf]\n", v.x, v.y); }
 
 static inline void v4print(vector4_t v) {
-  printf("<%lf, %lf, %lf, %lf>\n", v.x, v.y, v.z, v.w);
+  printf("[%lf, %lf, %lf, %lf]\n", v.x, v.y, v.z, v.w);
 }
 
 static inline void v3print(vector3_t v) {
@@ -174,8 +179,8 @@ static inline vector3_t v3m4x4mul(vector3_t v, matrix4x4_t A) {
   return v4tov3(v4m4x4mul(v3tov4(v), A));
 }
 
-static inline matrix4x4_t createRotationMatrix(double x, double y, double z) {
-  double yrotation[4][4] = {
+static inline matrix4x4_t createRotationMatrix(float x, float y, float z) {
+  float yrotation[4][4] = {
       {cos(y), 0, sin(y), 0},
       {0, 1, 0, 0},
       {-sin(y), 0, cos(y), 0},
@@ -183,7 +188,7 @@ static inline matrix4x4_t createRotationMatrix(double x, double y, double z) {
   };
   matrix4x4_t yrot = m4x4create(yrotation);
 
-  double xrotation[4][4] = {
+  float xrotation[4][4] = {
       {1, 0, 0, 0},
       {0, cos(x), -sin(x), 0},
       {0, sin(x), cos(x), 0},
@@ -191,7 +196,7 @@ static inline matrix4x4_t createRotationMatrix(double x, double y, double z) {
   };
   matrix4x4_t xrot = m4x4create(xrotation);
 
-  double zrotation[4][4] = {
+  float zrotation[4][4] = {
       {cos(z), -sin(z), 0, 0},
       {sin(z), cos(z), 0, 0},
       {0, 0, 1, 0},
@@ -202,10 +207,10 @@ static inline matrix4x4_t createRotationMatrix(double x, double y, double z) {
   return m4x4mul(3, xrot, yrot, zrot);
 }
 
-static inline matrix4x4_t createTranslationMatrix(double x, double y,
-                                                  double z) {
+static inline matrix4x4_t createTranslationMatrix(float x, float y,
+                                                  float z) {
 
-  double entries2[4][4] = {
+  float entries2[4][4] = {
       {1, 0, 0, 0},
       {0, 1, 0, 0},
       {0, 0, 1, 0},
@@ -214,9 +219,9 @@ static inline matrix4x4_t createTranslationMatrix(double x, double y,
   return m4x4create(entries2);
 }
 
-static inline matrix4x4_t createProjectionMatrix(double near, double far,
-                                                 double a, double fov) {
-  double entries5[4][4] = {
+static inline matrix4x4_t createProjectionMatrix(float near, float far,
+                                                 float a, float fov) {
+  float entries5[4][4] = {
       {a / tan(fov / 2), 0, 0, 0},
       {0, 1 / tan(fov / 2), 0, 0},
       {0, 0, (far + near) / (far - near), -1},
@@ -227,13 +232,13 @@ static inline matrix4x4_t createProjectionMatrix(double near, double far,
 
 static inline matrix4x4_t createViewMatrix() {}
 
-static inline double _det2(double A[2][2]) {
+static inline float _det2(float A[2][2]) {
   return A[0][0] * A[1][1] - A[0][1] * A[1][0];
 }
 
-static inline double _det3(double A[3][3]) {
-  double m[2][2];
-  double sum = 0;
+static inline float _det3(float A[3][3]) {
+  float m[2][2];
+  float sum = 0;
 
   // a00 column
   m[0][0] = A[1][1];
@@ -259,9 +264,9 @@ static inline double _det3(double A[3][3]) {
   return sum;
 }
 
-static inline double _det4(double A[4][4]) {
-  double m[3][3];
-  double sum = 0;
+static inline float _det4(float A[4][4]) {
+  float m[3][3];
+  float sum = 0;
 
   // a00 column
   m[0][0] = A[1][1];
@@ -314,11 +319,11 @@ static inline double _det4(double A[4][4]) {
   return sum;
 }
 
-static inline double m4x4det(matrix4x4_t A) { return _det4(A.entries); }
+static inline float m4x4det(matrix4x4_t A) { return _det4(A.entries); }
 
 static inline matrix4x4_t m4x4cofactor(matrix4x4_t A) {
-  double cofactor[4][4];
-  double m[3][3];
+  float cofactor[4][4];
+  float m[3][3];
 
   int factor_r = 1;
   int factor_c = 1;
@@ -360,7 +365,7 @@ static inline matrix4x4_t m4x4cofactor(matrix4x4_t A) {
 }
 
 static inline matrix4x4_t m4x4transpose(matrix4x4_t A) {
-  double copy[4][4] = {
+  float copy[4][4] = {
       {A.entries[0][0], A.entries[0][1], A.entries[0][2], A.entries[0][3]},
       {A.entries[1][0], A.entries[1][1], A.entries[1][2], A.entries[1][3]},
       {A.entries[2][0], A.entries[2][1], A.entries[2][2], A.entries[2][3]},
@@ -379,7 +384,7 @@ static inline matrix4x4_t m4x4adjoint(matrix4x4_t A) {
   return A;
 }
 
-static inline matrix4x4_t m4x4scale(matrix4x4_t A, double s) {
+static inline matrix4x4_t m4x4scale(matrix4x4_t A, float s) {
   for (int i = 0; i < 4; i++)
     for (int j = 0; j < 4; j++)
       A.entries[i][j] *= s;
@@ -387,7 +392,7 @@ static inline matrix4x4_t m4x4scale(matrix4x4_t A, double s) {
 }
 
 static inline matrix4x4_t m4x4invert(matrix4x4_t A) {
-  double det = m4x4det(A);
+  float det = m4x4det(A);
   matrix4x4_t adjoint = m4x4adjoint(A);
   adjoint = m4x4scale(adjoint, 1 / det);
   return adjoint;
