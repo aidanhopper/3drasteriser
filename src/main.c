@@ -81,7 +81,7 @@ int main() {
   int quit = 0;
   SDL_Event e;
 
-  v3mesh_t mesh = loadobjfile("teapot.obj");
+  v3mesh_t mesh = loadobjfile("objects/mountains.obj");
   mesh.color = 0xFFFFFF;
 
   unsigned int starttime = SDL_GetTicks();
